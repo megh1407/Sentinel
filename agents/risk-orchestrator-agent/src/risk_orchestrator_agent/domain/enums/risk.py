@@ -20,6 +20,20 @@ class RiskLevel(str, Enum):
     CATASTROPHIC = "catastrophic"
 
 
+# Ascending severity order (Phase 1 §5.1). DecisionEngine indexes into this
+# to decide whether a severity change is a jump large enough to force manual
+# review (see domain/decision/decision_engine.py). Defined here alongside the
+# enum it orders so the two stay in lock-step if the vocabulary ever changes.
+RISK_LEVEL_ORDER: tuple[RiskLevel, ...] = (
+    RiskLevel.NEGLIGIBLE,
+    RiskLevel.LOW,
+    RiskLevel.MODERATE,
+    RiskLevel.HIGH,
+    RiskLevel.CRITICAL,
+    RiskLevel.CATASTROPHIC,
+)
+
+
 class DecisionCategory(str, Enum):
     """`DecisionEngine`'s classification labels (Phase 2.4 §4.1).
 

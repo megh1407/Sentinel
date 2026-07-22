@@ -38,8 +38,9 @@ class PartialSnapshot:
     this into the engine is a dict-unpack, not a rewrite."""
     site_id: str
     zone_id: str
-    readings: dict[str, float] = field(default_factory=dict)   # e.g. {"temperature": 41.2}
-    dropped_gas_readings: int = 0                                # BLOCKED: B3, see module docstring
+    readings: dict[str, float] = field(default_factory=dict)   # e.g. {"temperature": 41.2, "methane": 900.0}
+    gas_sensor_ids: dict[str, str] = field(default_factory=dict)  # species -> originating sensor_id
+    dropped_gas_readings: int = 0                                # only unrecognized/untagged GAS readings
 
     @property
     def known_fields(self) -> frozenset[str]:
@@ -56,8 +57,22 @@ class SensorSnapshotAggregator:
         SensorType.TEMPERATURE: "temperature",
         SensorType.HUMIDITY: "humidity",
         SensorType.PRESSURE: "pressure",
-        # SensorType.GAS is deliberately absent -- see module docstring, B3.
+        # SensorType.GAS is resolved dynamically from payload.raw_metadata
+        # ["gas_species"] below (B3), not via this static map.
     }
+
+    # B3 RESOLVED: SensorType has a single undifferentiated GAS value, but the
+    # canonical SensorEventPayload already carries a free-form
+    # `raw_metadata: dict[str,str]` extensibility field. Producers tag each gas
+    # reading with `gas_species` (see scripts/demo/run_demo.py._gas_event); we
+    # accept the six species ThresholdService already has configured thresholds
+    # for, using the species name directly as the engine input field name (the
+    # engine services -- threshold_service._get_thresholds_for_gas etc. -- key
+    # on exactly these names). An untagged or unrecognized species is still
+    # counted and dropped, never guessed at.
+    _RECOGNIZED_GAS_SPECIES: frozenset[str] = frozenset(
+        {"methane", "carbon_monoxide", "hydrogen_sulfide", "oxygen", "voc", "ammonia"}
+    )
 
     def __init__(self) -> None:
         self._buffers: dict[tuple[str, str], PartialSnapshot] = {}
@@ -75,7 +90,12 @@ class SensorSnapshotAggregator:
         if engine_field is not None:
             snapshot.readings[engine_field] = event.payload.value
         elif event.payload.sensor_type == SensorType.GAS:
-            snapshot.dropped_gas_readings += 1
+            species = (event.payload.raw_metadata or {}).get("gas_species")
+            if species in self._RECOGNIZED_GAS_SPECIES:
+                snapshot.readings[species] = event.payload.value
+                snapshot.gas_sensor_ids[species] = event.payload.sensor_id
+            else:
+                snapshot.dropped_gas_readings += 1
 
         return snapshot
 

@@ -17,6 +17,7 @@ from risk_orchestrator_agent.domain.enums.event_types import (
     RecoveryMode,
 )
 from risk_orchestrator_agent.domain.enums.risk import (
+    RISK_LEVEL_ORDER,
     CorrelationType,
     DecisionCategory,
     HazardCategory,
@@ -43,6 +44,7 @@ from risk_orchestrator_agent.domain.enums.status import (
 )
 
 __all__ = [
+    "RISK_LEVEL_ORDER",
     "ConfidenceDerivationMethod",
     "ConfidenceLevel",
     "ContextLifecycleState",

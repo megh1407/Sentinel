@@ -17,7 +17,12 @@ change needed to point at a live registry.
 """
 from __future__ import annotations
 
-from schema_loader import list_event_schemas, load_event_schema
+from schema_loader import (
+    list_agent_contract_schemas,
+    list_event_schemas,
+    load_agent_contract_schema,
+    load_event_schema,
+)
 
 
 class LocalSchemaProvider:
@@ -33,6 +38,23 @@ class LocalSchemaProvider:
             schema = load_event_schema(name, version)
             key = (name, version_int)
             self._schema_cache[key] = schema
+            self._id_cache[key] = self._next_id
+            self._next_id += 1
+
+        # Agent-contract schemas (contracts/agent-contracts/<v>/<Type>.avsc)
+        # are transported identically to events (they carry the same envelope
+        # and their `event_type` field equals the .avsc stem, e.g.
+        # "WorkerAnalysis"). They were NOT being preloaded here, so every
+        # intelligence agent that publishes an analysis (Worker/Permit/
+        # Environment/...) failed with "no local schema registered" and its
+        # events dead-lettered. Load them alongside event schemas so the
+        # publish path resolves a schema the same way it does for ZoneState.
+        for name, version in list_agent_contract_schemas():
+            version_int = int(version.lstrip("v"))
+            key = (name, version_int)
+            if key in self._schema_cache:
+                continue
+            self._schema_cache[key] = load_agent_contract_schema(name, version)
             self._id_cache[key] = self._next_id
             self._next_id += 1
 

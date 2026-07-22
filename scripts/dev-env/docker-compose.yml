@@ -19,12 +19,25 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     environment:
+      # Fixed cluster id -- KRaft mode refuses to format without one
+      # (the original compose omitted this, so the broker never started).
+      CLUSTER_ID: "4L6g3nShT-eMCtK--X86sw"
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Single-node dev broker: every internal topic must be creatable at RF=1.
+      # KafkaTransport enables the idempotent producer (acks=all), which needs
+      # the transaction-state + offsets topics to exist -- so pin them to 1.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     ports: ["9092:9092"]
 
   schema-registry:

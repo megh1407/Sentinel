@@ -46,23 +46,51 @@ _state = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from sentinel_eventbus import EventProducer, InMemoryTransport
+    from sentinel_eventbus import EventProducer
+    from transport_factory import make_transport
 
     schema_provider = LocalSchemaProvider()
     _state["redis"] = redis_lib.Redis(
         host=os.environ.get("REDIS_HOST", "localhost"),
         port=int(os.environ.get("REDIS_PORT", "6379")),
     )
+    # Sync Neo4j driver for the API's own topology reads (FastAPI handlers are
+    # sync). The orchestrator thread keeps its own async driver; this one only
+    # serves /api/topology and seeds the graph idempotently at startup so the
+    # dashboard always has real, backend-derived topology to render.
+    _state["neo4j"] = None
+    try:
+        from neo4j import GraphDatabase
+        import neo4j_topology
+
+        driver = GraphDatabase.driver(
+            os.environ.get("NEO4J_URI", "bolt://localhost:7687"),
+            auth=(os.environ.get("NEO4J_USER", "neo4j"), os.environ.get("NEO4J_PASSWORD", "localdev")),
+        )
+        driver.verify_connectivity()
+        neo4j_topology.seed_default_topology_sync(driver)
+        _state["neo4j"] = driver
+    except Exception:  # noqa: BLE001 -- topology is optional; API still serves everything else
+        import logging
+        logging.getLogger(__name__).warning("neo4j_unavailable_for_api_topology", exc_info=True)
+    from response_runtime import ResponseAgent
+    import transport_factory
+
+    # Real-Kafka mode only: pre-create the topics before any consumer
+    # subscribes, so none dies with UNKNOWN_TOPIC_OR_PART. No-op on memory.
+    transport_factory.ensure_topics()
+
+    _state["response"] = ResponseAgent(redis_client=_state["redis"])
     _state["agents"] = start_all_agents(schema_provider)
     _state["cache"] = start_state_cache(schema_provider)
-    _state["orchestrator"] = start_orchestrator(schema_provider)
+    _state["orchestrator"] = start_orchestrator(schema_provider, response_agent=_state["response"])
     # Demo-generator producer, wired to the SAME InMemoryTransport process
     # the agents above are consuming from. Kept separate from run_demo.py's
     # own __main__ block, which -- run as a standalone `python run_demo.py`
     # process -- would NOT share this process's in-memory topic log (see
     # that file's module docstring). /api/demo/start below is the honest
     # way to trigger the Phase 11 scenario against a running gateway.
-    _state["demo_producer"] = EventProducer(InMemoryTransport(client_id="demo-generator"), schema_provider)
+    _state["demo_producer"] = EventProducer(make_transport(client_id="demo-generator"), schema_provider)
     yield
     for handle in _state.get("agents", []):
         handle.stop()
@@ -182,6 +210,66 @@ def start_demo():
     return {"status": "started", "scenario": "T0-T5 zone-A convergence"}
 
 
+@app.post("/api/demo/scenario/{name}")
+def run_scenario(name: str):
+    """Injects one named scenario's real events into the live pipeline
+    (Phase 9). Runs in a background thread; watch /api/risk-assessments,
+    /api/action-requests, or the WebSocket for the result."""
+    import threading as _threading
+    import demo_scenarios
+
+    fn = demo_scenarios.SCENARIOS.get(name)
+    if fn is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"unknown scenario {name!r}; choose one of {sorted(demo_scenarios.SCENARIOS)}",
+        )
+
+    _threading.Thread(target=lambda: fn(_state["demo_producer"]),
+                      daemon=True, name=f"scenario-{name}").start()
+    return {"status": "started", "scenario": name}
+
+
+@app.post("/api/demo/reset")
+def reset_demo():
+    """Resets DEMO state only: live zone state in Redis, cached assessments,
+    cached analyses, and Response Agent idempotency. Does NOT delete unrelated
+    historical/audit data."""
+    # Demo LIVE operational state only (Redis). NOT Postgres audit/history --
+    # those are the historical layer the prompt says must survive a reset.
+    _DEMO_STATE_PREFIXES = (
+        "sentinel:zone:",            # zone agent live state
+        "sentinel:v1:zone",          # risk orchestrator rolling per-zone context
+        "sentinel:worker:",          # worker presence
+        "sentinel:response:idempotency:",  # response idempotency
+        "permit_agent:seen_event:",  # permit agent dedupe (so re-run reprocesses)
+        "zone_intelligence:known_zone_ids",
+    )
+    cleared_zones = 0
+    r = _redis()
+    for prefix in _DEMO_STATE_PREFIXES:
+        for key in list(r.scan_iter(match=f"{prefix}*")):
+            if key.decode().startswith("sentinel:zone:state"):
+                cleared_zones += 1
+            r.delete(key)
+    _cache().reset()
+    orch = _state.get("orchestrator")
+    if orch is not None:
+        orch.publisher.clear()
+    resp = _state.get("response")
+    if resp is not None:
+        resp.reset()
+    # Reset topology node statuses back to normal.
+    driver = _state.get("neo4j")
+    if driver is not None:
+        try:
+            import neo4j_topology
+            neo4j_topology.seed_default_topology_sync(driver)  # MERGE re-normalizes statuses
+        except Exception:  # noqa: BLE001
+            pass
+    return {"status": "reset", "zones_cleared": cleared_zones}
+
+
 def _serialize_assessment(a) -> dict:
     """SystemRiskAssessment has no built-in .to_dict() -- this mirrors
     exactly the fields the master prompt's output contract lists, pulled
@@ -231,6 +319,34 @@ def get_risk_assessment(zone_id: str):
     if a is None:
         raise HTTPException(status_code=404, detail=f"no risk assessment yet for zone_id={zone_id!r}")
     return _serialize_assessment(a)
+
+
+@app.get("/api/action-requests")
+def list_action_requests():
+    """Real ActionRequests produced by the Response Agent, one per zone that
+    has been assessed. Each is derived from the finalized SystemRiskAssessment
+    -- the Response Agent never recalculates risk."""
+    return {"responses": _state["response"].all_latest()}
+
+
+@app.get("/api/action-requests/{zone_id}")
+def get_action_request(zone_id: str):
+    r = _state["response"].latest_for_zone(zone_id)
+    if r is None:
+        raise HTTPException(status_code=404, detail=f"no response yet for zone_id={zone_id!r}")
+    return r
+
+
+@app.get("/api/topology")
+def get_topology():
+    """Zone relationship graph, read straight from Neo4j (the same graph the
+    Risk Orchestrator queries for propagation). The dashboard renders this --
+    it does not invent topology. 503 if Neo4j is not wired."""
+    driver = _state.get("neo4j")
+    if driver is None:
+        raise HTTPException(status_code=503, detail="Neo4j topology not available")
+    import neo4j_topology
+    return neo4j_topology.read_topology_sync(driver)
 
 
 @app.get("/api/health")

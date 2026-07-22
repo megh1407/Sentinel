@@ -5,6 +5,7 @@ import { ZoneRecord, SiteState, FeedItem } from "@/lib/contracts";
 import StatusPill from "@/components/StatusPill";
 import SourceTag from "@/components/SourceTag";
 import PlantHeatmap from "@/components/PlantHeatmap";
+import PlantTopologyGraph from "@/components/PlantTopologyGraph";
 import LiveFeed from "@/components/LiveFeed";
 import { Users, Siren } from "lucide-react";
 
@@ -70,6 +71,14 @@ export default async function CommandCenter() {
           <SourceTag source={live ? "real" : "simulated"} />
         </div>
         <PlantHeatmap zones={zones} />
+      </section>
+
+      <section style={{ marginBottom: 32 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>How could it spread?</h2>
+        </div>
+        {/* Backend-derived Neo4j topology; renders nothing if unavailable. */}
+        <PlantTopologyGraph />
       </section>
 
       <section>

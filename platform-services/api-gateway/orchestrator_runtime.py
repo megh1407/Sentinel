@@ -65,8 +65,12 @@ class OrchestratorHandle:
         self._thread = thread
 
 
-def start_orchestrator(schema_provider: LocalSchemaProvider) -> OrchestratorHandle:
-    publisher = bridge.CachingEventPublisher()
+def start_orchestrator(schema_provider: LocalSchemaProvider, response_agent=None) -> OrchestratorHandle:
+    # response_agent (optional): its .handle(assessment) is called for every
+    # finalized SystemRiskAssessment, turning it into an ActionRequest. The
+    # orchestrator itself stays unaware of any response logic.
+    on_assessment = response_agent.handle if response_agent is not None else None
+    publisher = bridge.CachingEventPublisher(on_assessment=on_assessment)
     ready = threading.Event()
 
     def _thread_main() -> None:
@@ -95,11 +99,41 @@ async def _orchestrator_main(schema_provider: LocalSchemaProvider, publisher, re
         host=os.environ.get("REDIS_HOST", "localhost"),
         port=int(os.environ.get("REDIS_PORT", "6379")),
     )
-    # postgres_pool/neo4j_driver intentionally None -- HistoryRepositoryPort/
-    # GraphRepositoryPort are optional (ContextBuilder treats them as
-    # "that domain is absent", never as a crash), and neither Postgres nor
-    # Neo4j async clients were available to wire honestly in this pass.
-    repository_manager = RepositoryManager.from_clients(redis_client=redis_client)
+
+    # Neo4j: the orchestrator's Neo4jGraphAdapter needs an ASYNC driver
+    # (async with driver.session(); await session.run(); async for record).
+    # It is loop-bound like the async Redis client above, so construct it
+    # here inside the orchestrator's own event loop. When NEO4J_URI is unset
+    # (or the driver can't be built) we fall through to None, and
+    # spatial_enrichment degrades to topology_unavailable=True -- never a
+    # crash. Seeding of the zone topology is done by neo4j_topology.py.
+    neo4j_driver = None
+    neo4j_uri = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
+    if neo4j_uri:
+        try:
+            from neo4j import AsyncGraphDatabase
+
+            neo4j_driver = AsyncGraphDatabase.driver(
+                neo4j_uri,
+                auth=(
+                    os.environ.get("NEO4J_USER", "neo4j"),
+                    os.environ.get("NEO4J_PASSWORD", "localdev"),
+                ),
+            )
+            await neo4j_driver.verify_connectivity()
+            import neo4j_topology
+            await neo4j_topology.seed_default_topology(neo4j_driver)
+        except Exception:  # noqa: BLE001 -- topology is optional; degrade, don't crash
+            import logging as _logging
+            _logging.getLogger(__name__).warning("neo4j_unavailable_at_startup", exc_info=True)
+            neo4j_driver = None
+
+    # postgres_pool intentionally None here -- HistoryRepositoryPort is
+    # optional (ContextBuilder treats it as "that domain absent"); historical
+    # audit is persisted separately by the API gateway's own repositories.
+    repository_manager = RepositoryManager.from_clients(
+        redis_client=redis_client, neo4j_driver=neo4j_driver,
+    )
     orchestrator, event_router = build_orchestrator(repository_manager, publisher=publisher)
 
     from sentinel_contracts.events.zone_state_v1 import ZoneStateV1
@@ -114,8 +148,9 @@ async def _orchestrator_main(schema_provider: LocalSchemaProvider, publisher, re
         "WorkerAnalysis": WorkerAnalysisV1,
     }
 
+    from transport_factory import make_transport
     consumer = EventConsumer(
-        InMemoryTransport(client_id="risk-orchestrator-consumer"), schema_provider,
+        make_transport(client_id="risk-orchestrator-consumer"), schema_provider,
         event_types, group_id="risk-orchestrator",
     )
 

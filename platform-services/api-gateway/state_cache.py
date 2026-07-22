@@ -19,7 +19,9 @@ from __future__ import annotations
 
 import threading
 
-from sentinel_eventbus import EventConsumer, InMemoryTransport, LocalSchemaProvider
+from sentinel_eventbus import EventConsumer, LocalSchemaProvider
+
+from transport_factory import make_transport
 from sentinel_contracts.agent_contracts.environment_analysis_v1 import EnvironmentAnalysisV1
 from sentinel_contracts.agent_contracts.permit_analysis_v1 import PermitAnalysisV1
 from sentinel_contracts.agent_contracts.worker_analysis_v1 import WorkerAnalysisV1
@@ -81,6 +83,13 @@ class StateCache:
         with self._lock:
             return list(self._workers.values())
 
+    def reset(self) -> None:
+        """Clears cached analysis state (demo reset only)."""
+        with self._lock:
+            self._environment.clear()
+            self._permits.clear()
+            self._workers.clear()
+
 
 def start_state_cache(schema_provider: LocalSchemaProvider) -> StateCache:
     cache = StateCache()
@@ -90,7 +99,7 @@ def start_state_cache(schema_provider: LocalSchemaProvider) -> StateCache:
         "WorkerAnalysis": WorkerAnalysisV1,
     }
     consumer = EventConsumer(
-        InMemoryTransport(client_id="api-gateway-state-cache"), schema_provider,
+        make_transport(client_id="api-gateway-state-cache"), schema_provider,
         event_types, group_id="api-gateway",
     )
 

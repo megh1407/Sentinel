@@ -39,8 +39,10 @@ import sys
 import threading
 from contextlib import contextmanager
 
-from sentinel_eventbus import EventConsumer, EventProducer, InMemoryTransport, LocalSchemaProvider
+from sentinel_eventbus import EventConsumer, EventProducer, LocalSchemaProvider
 from sentinel_agent_sdk import AgentRunner
+
+from transport_factory import make_transport
 from sentinel_state import StateContainer, build_engine, build_session_factory
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -136,9 +138,9 @@ def _start_zone_agent(schema_provider: LocalSchemaProvider) -> AgentHandle:
         "PermitEvent": PermitEventV1,
     }
 
-    producer = EventProducer(InMemoryTransport(client_id="zone-agent-producer"), schema_provider)
+    producer = EventProducer(make_transport(client_id="zone-agent-producer"), schema_provider)
     consumer = EventConsumer(
-        InMemoryTransport(client_id="zone-agent-consumer"), schema_provider,
+        make_transport(client_id="zone-agent-consumer"), schema_provider,
         event_types, group_id="zone-intelligence-agent",
     )
     state = StateContainer(redis_client=_redis_client(), postgres_session_factory=sf)
@@ -164,9 +166,9 @@ def _start_environmental_agent(schema_provider: LocalSchemaProvider) -> AgentHan
     input_topics = ["sentinel.sensor.events.v1"]
     event_types = {"SensorEvent": SensorEventV1}
 
-    producer = EventProducer(InMemoryTransport(client_id="environmental-agent-producer"), schema_provider)
+    producer = EventProducer(make_transport(client_id="environmental-agent-producer"), schema_provider)
     consumer = EventConsumer(
-        InMemoryTransport(client_id="environmental-agent-consumer"), schema_provider,
+        make_transport(client_id="environmental-agent-consumer"), schema_provider,
         event_types, group_id="environmental-intelligence-agent",
     )
     state = StateContainer()  # no backend, matches the agent's own main.py
@@ -194,9 +196,9 @@ def _start_permit_agent(schema_provider: LocalSchemaProvider) -> AgentHandle:
     input_topics = ["sentinel.permit.events.v1", "sentinel.zone.state.v1"]
     event_types = {"PermitEvent": PermitEventV1, "ZoneState": ZoneStateV1}
 
-    producer = EventProducer(InMemoryTransport(client_id="permit-agent-producer"), schema_provider)
+    producer = EventProducer(make_transport(client_id="permit-agent-producer"), schema_provider)
     consumer = EventConsumer(
-        InMemoryTransport(client_id="permit-agent-consumer"), schema_provider,
+        make_transport(client_id="permit-agent-consumer"), schema_provider,
         event_types, group_id="permit-intelligence-agent",
     )
     sf = _postgres_session_factory()
@@ -219,8 +221,13 @@ def _start_worker_agent(schema_provider: LocalSchemaProvider) -> AgentHandle:
     with _isolated_import(worker_inner, purge_names=("config", "worker_safety_agent",
                                                        "ppe_compliance_service", "health")):
         from worker_safety_agent import WorkerSafetyAgent
-        from config import build_zone_ppe_requirements
-        agent = WorkerSafetyAgent(zone_ppe_requirements=build_zone_ppe_requirements())
+        # NOTE: this agent's config.py/main.py are empty stubs in the repo --
+        # the previously-assumed config.build_zone_ppe_requirements() never
+        # existed. WorkerSafetyAgent already builds a default
+        # ZonePPERequirements() internally when constructed with no argument
+        # (see worker_safety_agent.py __init__), so honor that real default
+        # rather than a fabricated config loader.
+        agent = WorkerSafetyAgent()
 
     from sentinel_contracts.events.worker_event_v1 import WorkerEventV1
     from sentinel_contracts.events.zone_state_v1 import ZoneStateV1
@@ -228,9 +235,9 @@ def _start_worker_agent(schema_provider: LocalSchemaProvider) -> AgentHandle:
     input_topics = ["sentinel.worker.events.v1", "sentinel.zone.state.v1"]
     event_types = {"WorkerEvent": WorkerEventV1, "ZoneState": ZoneStateV1}
 
-    producer = EventProducer(InMemoryTransport(client_id="worker-agent-producer"), schema_provider)
+    producer = EventProducer(make_transport(client_id="worker-agent-producer"), schema_provider)
     consumer = EventConsumer(
-        InMemoryTransport(client_id="worker-agent-consumer"), schema_provider,
+        make_transport(client_id="worker-agent-consumer"), schema_provider,
         event_types, group_id="worker-safety-agent",
     )
     state = StateContainer()  # no backend, matches the agent's own main.py

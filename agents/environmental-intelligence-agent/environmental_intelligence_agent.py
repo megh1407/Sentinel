@@ -23,12 +23,58 @@ invoked yet and what unblocks it.
 """
 from __future__ import annotations
 
+import asyncio
+import uuid
+from datetime import datetime, timezone
+
 from pydantic import BaseModel
 
 from sentinel_agent_sdk import BaseAgent
 from sentinel_contracts.events.sensor_event_v1 import SensorEventV1
+from sentinel_contracts.agent_contracts.environment_analysis_v1 import (
+    EnvironmentAnalysisV1,
+    EnvironmentAnalysisPayload,
+    HazardReading,
+    HazardType,
+    HazardTrend,
+)
+from sentinel_contracts.common.confidence_score import ConfidenceDerivation, ConfidenceScore
+from sentinel_contracts.common.explanation_object import ExplanationObject
+from sentinel_contracts.common.metadata import Environment, Metadata
 
+from engine.enums import Severity
 from sensor_snapshot_aggregator import SensorSnapshotAggregator
+
+AGENT_NAME = "environmental_intelligence_agent"
+AGENT_VERSION = "0.2.0"  # now publishes real EnvironmentAnalysisV1 (was a no-op stub)
+
+# Closed vocabulary: which HazardType each recognized engine field maps to.
+# A documented judgment call (like the Worker agent's), not invented data --
+# these are the standard industrial-safety classifications for each species.
+_FIELD_TO_HAZARD_TYPE: dict[str, HazardType] = {
+    "methane": HazardType.flammable_gas,
+    "voc": HazardType.flammable_gas,
+    "carbon_monoxide": HazardType.toxic_gas,
+    "hydrogen_sulfide": HazardType.toxic_gas,
+    "ammonia": HazardType.toxic_gas,
+    "oxygen": HazardType.oxygen_deficiency,
+    "temperature": HazardType.high_temperature,
+    "pressure": HazardType.high_pressure,
+}
+_FIELD_UNIT: dict[str, str] = {
+    "methane": "ppm", "voc": "ppm", "carbon_monoxide": "ppm",
+    "hydrogen_sulfide": "ppm", "ammonia": "ppm", "oxygen": "%",
+    "temperature": "C", "pressure": "psi",
+}
+# Severity -> normalized risk contribution (documented mapping; the engine's
+# RiskService uses a richer model, but for the per-hazard->analysis risk_score
+# this monotonic ladder is explicit and auditable).
+_SEVERITY_SCORE: dict[Severity, float] = {
+    Severity.CRITICAL: 0.9,
+    Severity.HIGH: 0.7,
+    Severity.WARNING: 0.5,
+    Severity.ADVISORY: 0.3,
+}
 
 from engine.history_manager import HistoryManager
 from engine.validation_service import ValidationService
@@ -64,6 +110,10 @@ class EnvironmentalIntelligenceAgent(BaseAgent):
         because neither did before this migration."""
         self._aggregator = SensorSnapshotAggregator()
         self._history_manager = HistoryManager()
+        # per-(zone,field) last measured value, for a real rising/falling/stable
+        # trend on each HazardReading (not fabricated -- only set once a second
+        # reading for that field actually arrives).
+        self._last_values: dict[tuple[str, str], float] = {}
 
         self._validation_service = ValidationService()
         self._event_service = EventService()
@@ -142,4 +192,119 @@ class EnvironmentalIntelligenceAgent(BaseAgent):
             available_fields=sorted(snapshot.known_fields),
             dropped_gas_readings=snapshot.dropped_gas_readings,
         )
-        return None
+        if not snapshot.readings:
+            # Only unrecognized/untagged readings so far -- nothing to analyze.
+            return None
+
+        return self._build_analysis(event, snapshot)
+
+    def _build_analysis(self, event: SensorEventV1, snapshot) -> "EnvironmentAnalysisV1":
+        """Runs the REAL, config-driven ThresholdService over the current
+        per-zone snapshot and emits an EnvironmentAnalysisV1. The threshold
+        values and severity ladder are the engine's own
+        (engine/threshold_service.py + config.settings) -- this method adds no
+        detection logic of its own, only the wire-format translation from the
+        engine's violation dicts to the HazardReading contract the Risk
+        Orchestrator consumes.
+        """
+        # ThresholdService is async; process() runs on the (sync) agent thread,
+        # so drive it on a throwaway loop -- no loop is running here.
+        violations = asyncio.run(self._threshold_service.check_all_thresholds(snapshot.readings))
+        sev_by_field = {v["gas_type"]: v["severity"] for v in violations}
+        thr_by_field = {v["gas_type"]: v["threshold_value"] for v in violations}
+
+        hazards: list[HazardReading] = []
+        worst_score = 0.0
+        any_critical = False
+        for field_name, value in sorted(snapshot.readings.items()):
+            hazard_type = _FIELD_TO_HAZARD_TYPE.get(field_name)
+            if hazard_type is None:
+                continue
+            severity = sev_by_field.get(field_name)
+            breach = severity is not None
+            score = _SEVERITY_SCORE.get(severity, 0.0) if breach else 0.0
+            worst_score = max(worst_score, score)
+            any_critical = any_critical or (severity == Severity.CRITICAL)
+
+            key = (event.zone_id, field_name)
+            prev = self._last_values.get(key)
+            if prev is None or value == prev:
+                trend = HazardTrend.stable
+            elif value > prev:
+                trend = HazardTrend.rising
+            else:
+                trend = HazardTrend.falling
+            self._last_values[key] = value
+
+            # Reference threshold: the breached level if any, else the
+            # configured 'warning' threshold for that species.
+            threshold_ppm = thr_by_field.get(field_name)
+            if threshold_ppm is None:
+                threshold_ppm = self._threshold_service.get_threshold(field_name, "warning")
+
+            hazards.append(HazardReading(
+                hazard_type=hazard_type,
+                measured_value=value,
+                unit=_FIELD_UNIT.get(field_name),
+                threshold_ppm=threshold_ppm,
+                threshold_breach=breach,
+                trend=trend,
+                sensor_ids=[snapshot.gas_sensor_ids.get(field_name, event.payload.sensor_id)],
+            ))
+
+        breached = [h for h in hazards if h.threshold_breach]
+        confidence = 0.85
+        now = datetime.now(timezone.utc)
+        summary = (
+            f"{len(breached)} hazard threshold breach(es) in zone {event.zone_id}: "
+            + ", ".join(f"{h.hazard_type.value}={h.measured_value}{h.unit or ''}" for h in breached)
+            if breached else
+            f"No hazard thresholds breached in zone {event.zone_id} "
+            f"({len(hazards)} reading(s) monitored)."
+        )
+        evidence = [
+            f"{h.hazard_type.value} {h.measured_value}{h.unit or ''} "
+            f"(threshold {h.threshold_ppm}, breach={h.threshold_breach}, trend={h.trend.value})"
+            for h in hazards
+        ]
+        recommendations = (
+            ["Initiate evacuation of affected zone."] if any_critical
+            else ["Increase ventilation and monitor trend."] if breached
+            else []
+        )
+
+        return EnvironmentAnalysisV1(
+            event_id=uuid.uuid4(),
+            event_timestamp=now,
+            correlation_id=event.correlation_id,
+            causation_id=event.event_id,
+            producer_service=AGENT_NAME,
+            producer_version=AGENT_VERSION,
+            site_id=event.site_id,
+            zone_id=event.zone_id,
+            partition_key=event.zone_id,
+            trace_id=getattr(event, "trace_id", None),
+            metadata=Metadata(schema_id=1, schema_version=1, environment=Environment.DEV),
+            agent_id=AGENT_NAME,
+            agent_version=AGENT_VERSION,
+            input_events=[event.event_id],
+            confidence=confidence,
+            processing_time_ms=0,
+            explanation=ExplanationObject(
+                summary=summary,
+                confidence=ConfidenceScore(value=confidence, derivation=ConfidenceDerivation.RULE_BASED),
+                evidence=[],
+                reasoning_steps=[],
+                generated_at=now,
+            ),
+            payload=EnvironmentAnalysisPayload(
+                risk_score=worst_score,
+                confidence=confidence,
+                hazards=hazards,
+                evacuation_required=any_critical,
+                affected_zones=[event.zone_id],
+                evidence=evidence,
+                recommendations=recommendations,
+                analyzed_at=now,
+            ),
+        )

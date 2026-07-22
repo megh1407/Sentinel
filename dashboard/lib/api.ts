@@ -10,12 +10,13 @@
  * IMPORTANT, honestly stated: the api-gateway's /api/zones response gives
  * real ZoneState (from Redis) and real EnvironmentAnalysis / PermitAnalysis
  * / WorkerAnalysis (from its in-memory cache of the real agents' output --
- * see state_cache.py). There is no RiskScore anywhere in the real system
- * yet (that's the Risk Orchestrator's job, out of scope per the master
- * prompt) -- riskScore is always mapped to null here, same as its
- * "simulated, not yet backed" status in contracts.ts. Anything this file
- * cannot honestly derive from a real API response is left null/empty
- * rather than fabricated.
+ * see state_cache.py). riskScore is now ALSO real: the Risk Orchestrator
+ * (agents/risk-orchestrator-agent) is wired and its SystemRiskAssessment is
+ * served at /api/risk-assessments -- fetchZoneRecords attaches it per zone.
+ * Topology (/api/topology, from Neo4j) and response decisions
+ * (/api/action-requests, from the Response Agent) are exposed too. Anything
+ * this file cannot honestly derive from a real API response is still left
+ * null/empty rather than fabricated.
  */
 import {
   ZoneRecord,
@@ -26,6 +27,8 @@ import {
   SiteState,
   FeedItem,
   RiskLevel,
+  RiskScore,
+  RiskSeverity,
 } from "./contracts";
 
 const API_BASE = process.env.NEXT_PUBLIC_SENTINEL_API_BASE ?? "http://localhost:8000";
@@ -158,6 +161,74 @@ function mapWorker(raw: any): WorkerAnalysis {
   };
 }
 
+// -- Risk Orchestrator output (/api/risk-assessments) -----------------------
+
+export interface TopologyEdge {
+  from: string;
+  to: string;
+  relationship_type: string;
+  distance_m: number | null;
+}
+export interface Topology {
+  nodes: { zone_id: string; current_status: string | null }[];
+  edges: TopologyEdge[];
+}
+
+function mapRiskAssessment(raw: any): RiskScore {
+  return {
+    risk_id: raw.assessment_id,
+    zone_id: raw.zone_id,
+    score: raw.global_score,
+    severity: raw.severity as RiskSeverity,
+    // The real assessment carries contributing_factors as strings; surface
+    // each as a contributor row rather than inventing per-agent weights.
+    contributors: (raw.contributing_factors ?? []).map((f: string) => ({
+      agent: "risk_orchestrator",
+      factor: f,
+      weight: 0,
+      score: raw.global_score,
+      evidence: [],
+    })),
+    explanation_summary: raw.explanation ?? "",
+    computed_at: raw.computed_at,
+  };
+}
+
+/** All latest SystemRiskAssessments, keyed by zone_id. */
+export async function fetchRiskAssessments(): Promise<Record<string, RiskScore>> {
+  const res = await fetch(`${API_BASE}/api/risk-assessments`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`api-gateway /api/risk-assessments returned ${res.status}`);
+  const data: { assessments: any[] } = await res.json();
+  const byZone: Record<string, RiskScore> = {};
+  for (const a of data.assessments) byZone[a.zone_id] = mapRiskAssessment(a);
+  return byZone;
+}
+
+/** Zone relationship graph from Neo4j (for RelationshipGraph / topology views). */
+export async function fetchTopology(): Promise<Topology> {
+  const res = await fetch(`${API_BASE}/api/topology`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`api-gateway /api/topology returned ${res.status}`);
+  return res.json();
+}
+
+/** Response Agent decisions (ActionRequests), keyed by zone_id. */
+export async function fetchActionRequests(): Promise<Record<string, any>> {
+  const res = await fetch(`${API_BASE}/api/action-requests`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`api-gateway /api/action-requests returned ${res.status}`);
+  const data: { responses: any[] } = await res.json();
+  const byZone: Record<string, any> = {};
+  for (const r of data.responses) byZone[r.zone_id] = r;
+  return byZone;
+}
+
+/** Fire a demo scenario (normal | gas-rise | compound-risk | multi-zone-emergency). */
+export async function runScenario(name: string): Promise<void> {
+  await fetch(`${API_BASE}/api/demo/scenario/${name}`, { method: "POST" });
+}
+export async function resetDemo(): Promise<void> {
+  await fetch(`${API_BASE}/api/demo/reset`, { method: "POST" });
+}
+
 /** Throws on any network/parse failure -- callers decide how to fall back. */
 export async function fetchZoneRecord(zoneId: string): Promise<ZoneRecord | null> {
   const res = await fetch(`${API_BASE}/api/zones/${encodeURIComponent(zoneId)}`, { cache: "no-store" });
@@ -166,6 +237,7 @@ export async function fetchZoneRecord(zoneId: string): Promise<ZoneRecord | null
   const entry: RawZoneEntry = await res.json();
   const state = mapZoneState(entry.zone_state);
   const layout = layoutFor(state.zone_id, 0);
+  const risk = await fetchRiskAssessments().catch(() => ({} as Record<string, RiskScore>));
   return {
     zoneId: state.zone_id,
     displayName: layout.displayName,
@@ -176,7 +248,7 @@ export async function fetchZoneRecord(zoneId: string): Promise<ZoneRecord | null
     environment: mapEnvironment(entry.environment),
     permits: entry.active_permits.map(mapPermit),
     workers: entry.workers.map(mapWorker),
-    riskScore: null,
+    riskScore: risk[state.zone_id] ?? null,
   };
 }
 
@@ -185,6 +257,10 @@ export async function fetchZoneRecords(): Promise<ZoneRecord[]> {
   const res = await fetch(`${API_BASE}/api/zones`, { cache: "no-store" });
   if (!res.ok) throw new Error(`api-gateway /api/zones returned ${res.status}`);
   const data: { zones: RawZoneEntry[] } = await res.json();
+  // Real risk from the Risk Orchestrator, attached per zone. Best-effort: if
+  // the orchestrator hasn't produced an assessment for a zone yet, riskScore
+  // stays null (a real absence, not a fabricated zero).
+  const risk = await fetchRiskAssessments().catch(() => ({} as Record<string, RiskScore>));
 
   return data.zones.map((entry, index) => {
     const state = mapZoneState(entry.zone_state);
@@ -202,9 +278,7 @@ export async function fetchZoneRecords(): Promise<ZoneRecord[]> {
       environment: mapEnvironment(entry.environment),
       permits: entry.active_permits.map(mapPermit),
       workers: entry.workers.map(mapWorker),
-      // No Risk Orchestrator exists yet -- out of scope per the master
-      // prompt. Real absence, not a loading state.
-      riskScore: null,
+      riskScore: risk[state.zone_id] ?? null,
     };
   });
 }
