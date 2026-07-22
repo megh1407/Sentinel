@@ -1,0 +1,32 @@
+{
+  "type": "record",
+  "name": "ZoneAnomalyDetected",
+  "namespace": "com.sentinel.events.zoneanomalydetected.v1",
+  "doc": "Published by the Zone Intelligence Agent when a zone crosses an abnormal condition threshold. Decision-bearing: explanation REQUIRED.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "ZoneAnomalyDetected"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string", "default": "zone-intelligence-agent"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": "string"},
+    {"name": "partition_key", "type": "string"},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "explanation", "type": "com.sentinel.common.ExplanationObject"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "ZoneAnomalyDetectedPayload",
+      "fields": [
+        {"name": "anomaly_id", "type": "string"},
+        {"name": "anomaly_type", "type": {"type": "enum", "name": "ZoneAnomalyType",
+          "symbols": ["OCCUPANCY_EXCEEDED", "ENVIRONMENTAL_HAZARD", "RESTRICTED_AREA_VIOLATION", "ZONE_HEALTH_DEGRADED", "PERMIT_CONFLICT", "INCIDENT_FREQUENCY_EXCEEDED", "REPEATED_ANOMALIES", "RAPID_STATE_CHANGE", "MISSING_SENSOR_DATA"]}},
+        {"name": "severity", "type": {"type": "enum", "name": "AnomalySeverity", "symbols": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]}}
+      ]
+    }}
+  ]
+}

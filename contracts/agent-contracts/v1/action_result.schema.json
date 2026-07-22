@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/agent-contracts/v1/action_result",
+  "title": "ActionResult",
+  "description": "Execution outcome from the Action Gateway.",
+  "allOf": [{ "$ref": "../../events/v1/base_event.schema.json" }],
+  "required": ["action_id","status","executed_by","audit_reference","result_at"],
+  "properties": {
+    "event_type":       { "const": "action.result" },
+    "action_id":        { "type": "string", "format": "uuid" },
+    "status":           { "type": "string", "enum": ["pending_approval","approved","rejected","executing","completed","failed","expired"] },
+    "executed_by":      { "type": "string" },
+    "audit_reference":  { "type": "string" },
+    "result_at":        { "type": "string", "format": "date-time" },
+    "rejection_reason": { "type": "string" },
+    "execution_details":{ "type": "object" }
+  }
+}

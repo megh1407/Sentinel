@@ -1,0 +1,188 @@
+{
+  "type": "record",
+  "name": "ExplanationDocument",
+  "namespace": "com.sentinel.agentcontracts.explanationdocument.v1",
+  "doc": "Avro translation of contracts/agent-contracts/v1/explanation.schema.json, renamed ExplanationDocument per Artifact 7 \u00a79 to disambiguate from Layer 0's ExplanationObject (contracts/common/ExplanationObject.avsc). Human-readable explanation from the Safety Copilot Agent for dashboard or operator query. Per Artifact 7 \u00a79, composes multiple ExplanationObject instances via a new ReasoningStep record rather than restating the source schema's ad hoc 'evidence'/'reasoning_chain' shapes.",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "explanation.generated"
+    },
+    {
+      "name": "event_version",
+      "type": "int",
+      "default": 1
+    },
+    {
+      "name": "event_timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "correlation_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "causation_id",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "producer_service",
+      "type": "string"
+    },
+    {
+      "name": "producer_version",
+      "type": "string"
+    },
+    {
+      "name": "site_id",
+      "type": "string"
+    },
+    {
+      "name": "zone_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "partition_key",
+      "type": "string"
+    },
+    {
+      "name": "trace_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "metadata",
+      "type": "com.sentinel.common.Metadata"
+    },
+    {
+      "name": "explanation_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "triggered_by",
+      "type": [
+        "null",
+        {
+          "type": "enum",
+          "name": "ExplanationTrigger",
+          "symbols": [
+            "risk_score",
+            "operator_query",
+            "incident",
+            "scheduled"
+          ]
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "risk_id",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "summary",
+      "type": "string"
+    },
+    {
+      "name": "reasoning_steps",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "ReasoningStep",
+          "doc": "Composes one ExplanationObject per step, per Artifact 7 \u00a79 -- replaces the source schema's separate ad hoc 'evidence' array and 'reasoning_chain' array with a single ordered sequence of full explanations, one per contributing agent/step.",
+          "fields": [
+            {
+              "name": "step",
+              "type": "int"
+            },
+            {
+              "name": "agent",
+              "type": "string"
+            },
+            {
+              "name": "explanation",
+              "type": "com.sentinel.common.ExplanationObject"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "related_events",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      }
+    },
+    {
+      "name": "similar_incidents",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": []
+    },
+    {
+      "name": "recommended_actions",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": []
+    },
+    {
+      "name": "language",
+      "type": "string",
+      "default": "en"
+    },
+    {
+      "name": "generated_at",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    }
+  ]
+}

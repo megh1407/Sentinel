@@ -1,0 +1,24 @@
+# contracts layer (already built)
+fastavro>=1.9,<2
+pydantic>=2.7,<3
+requests>=2.31,<3
+
+# eventbus
+confluent-kafka>=2.5,<3
+
+# state
+redis>=5.0,<6
+sqlalchemy>=2.0,<3
+psycopg2-binary>=2.9,<3
+alembic>=1.13,<2
+neo4j>=5.20,<7
+qdrant-client>=1.9,<2
+
+# agent sdk / observability
+structlog>=24.1,<27
+opentelemetry-sdk>=1.24,<2
+opentelemetry-exporter-otlp>=1.24,<2
+prometheus-client>=0.20,<1
+
+# testing
+pytest>=8.0,<9

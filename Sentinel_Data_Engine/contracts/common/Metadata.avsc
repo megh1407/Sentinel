@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "Metadata",
+  "namespace": "com.sentinel.common",
+  "doc": "Envelope metadata attached to every event for schema governance, retry tracking, and audit correlation.",
+  "fields": [
+    {"name": "schema_id", "type": "int", "doc": "Confluent Schema Registry global schema ID assigned at registration time."},
+    {"name": "schema_version", "type": "int", "doc": "Subject-relative schema version (monotonically increasing per subject)."},
+    {"name": "retry_count", "type": "int", "default": 0, "doc": "Number of redelivery attempts for this logical event. 0 on first delivery."},
+    {"name": "audit_id", "type": ["null", "string"], "default": null, "doc": "Assigned only when this event is itself an audited action; null otherwise."},
+    {"name": "environment", "type": "com.sentinel.common.Environment", "doc": "Deployment environment that produced this event."},
+    {"name": "tags", "type": {"type": "map", "values": "string"}, "default": {}, "doc": "Free-form, non-schema-validated key/value tags for operational filtering. Never used for business logic."}
+  ]
+}

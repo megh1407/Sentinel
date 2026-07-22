@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/agent-contracts/v1/zone_analysis",
+  "title": "ZoneAnalysis",
+  "allOf": [{ "$ref": "./agent_result.schema.json" }],
+  "properties": {
+    "result_type": { "const": "zone_analysis" },
+    "payload": {
+      "type": "object",
+      "required": ["zone_state","risk_score","confidence","risk_factors","evidence","recommendations","analyzed_at"],
+      "properties": {
+        "zone_state":   { "type": "string", "enum": ["safe","watch","warning","danger","evacuate","lockdown"] },
+        "risk_score":   { "type": "number", "minimum": 0, "maximum": 100 },
+        "confidence":   { "type": "number", "minimum": 0, "maximum": 1 },
+        "risk_factors": { "type": "array", "items": { "type": "string" } },
+        "anomalies":    { "type": "array", "items": { "type": "object", "properties": { "anomaly_type": {"type":"string"}, "description": {"type":"string"}, "severity": {"type":"string","enum":["low","medium","high","critical"]}, "sensor_ids": {"type":"array","items":{"type":"string"}} } } },
+        "worker_count": { "type": "integer", "minimum": 0 },
+        "equipment_ids":{ "type": "array", "items": { "type": "string" } },
+        "environmental_conditions": { "type": "object", "properties": { "temperature_c": {"type":"number"}, "humidity_pct": {"type":"number"}, "gas_levels": {"type":"object","additionalProperties":{"type":"number"}} } },
+        "evidence":        { "type": "array", "items": { "type": "string" } },
+        "recommendations": { "type": "array", "items": { "type": "string" } },
+        "analyzed_at":     { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

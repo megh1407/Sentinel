@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "EvidenceItem",
+  "namespace": "com.sentinel.common",
+  "doc": "A single, pointer-based piece of evidence supporting an Explanation. Always traces back to a real, immutable, already-published source event -- never a synthesized or paraphrased fact.",
+  "fields": [
+    {"name": "source_event_id", "type": "string", "doc": "UUIDv7 of the upstream event this evidence was derived from."},
+    {"name": "source_type", "type": "string", "doc": "The event_type of the source event, e.g. 'SensorEvent', 'PermitEvent'."},
+    {"name": "description", "type": "string", "doc": "Human-readable, deterministic description of what this evidence shows."},
+    {"name": "weight", "type": "double", "doc": "Relative contribution of this evidence item to the parent decision, in [0,1]."},
+    {"name": "timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}, "doc": "occurred_at of the source event, not the time this EvidenceItem was constructed."}
+  ]
+}

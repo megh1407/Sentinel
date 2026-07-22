@@ -1,0 +1,20 @@
+{
+  "type": "record",
+  "name": "BaseEvent",
+  "namespace": "com.sentinel.common",
+  "doc": "Canonical envelope shared by every SENTINEL event. Domain event schemas (contracts/events/*) inline these exact fields plus a payload field, rather than using Avro inheritance (which Avro does not support) -- this record exists as the single documented source of truth for envelope field names/types/order, enforced by a codegen lint that diffs every event schema's envelope fields against this definition.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}, "doc": "UUIDv7, unique per event instance."},
+    {"name": "event_type", "type": "string", "doc": "e.g. 'SensorEvent'. Must match the schema subject name."},
+    {"name": "event_version", "type": "int", "doc": "Major version of the payload schema, e.g. 1."},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}, "doc": "occurred_at -- when the real-world fact happened, UTC."},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}, "doc": "Ties together every event in one causal chain. Minted once at ingestion."},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null, "doc": "event_id of the direct parent event that caused this one. Null only for the first event in a chain."},
+    {"name": "producer_service", "type": "string", "doc": "Service name that published this event, e.g. 'zone-intelligence-agent'."},
+    {"name": "producer_version", "type": "string", "doc": "Semver of the producing service, e.g. '1.4.2'."},
+    {"name": "site_id", "type": "string", "doc": "Factory/site identifier."},
+    {"name": "partition_key", "type": "string", "doc": "The Kafka partition key actually used to publish this event (e.g. zone_id or asset_id) -- included in-payload so the key is auditable/replayable even outside Kafka's own header."},
+    {"name": "trace_id", "type": ["null", "string"], "default": null, "doc": "W3C traceparent trace-id for distributed tracing correlation."},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"}
+  ]
+}

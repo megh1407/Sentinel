@@ -1,0 +1,302 @@
+# ============================================================
+# SENTINEL Agent Registry
+# Single source of truth for who consumes/produces what.
+# Every agent MUST be registered here before deployment.
+# CI validates: every topic an agent consumes/produces exists
+# in topics/kafka_topics.yaml, and every schema referenced
+# exists in events/v1 or agent-contracts/v1.
+# ============================================================
+
+zone_intelligence_agent:
+  display_name: "Zone Intelligence Agent"
+  version: "2.4.1"
+  owner: "team-perception@sentinel.io"
+  description: "Factory perception layer. Understands every industrial zone."
+  consumes:
+    topics:
+      - sentinel.sensor.events.v1
+      - sentinel.worker.analysis.v1   # for worker_count context
+      - sentinel.equipment.state.v1
+    schemas:
+      - sensor_event
+      - worker_event
+      - equipment_state
+  produces:
+    topics:
+      - sentinel.zone.analysis.v1
+      - sentinel.zone.state.v1
+    schemas:
+      - zone_analysis
+      - zone_state
+  dependencies:
+    - none
+  sla:
+    max_processing_time_ms: 500
+    min_confidence: 0.6
+  scaling:
+    min_replicas: 5
+    max_replicas: 200
+    scale_on: "consumer_lag > 1000"
+
+permit_intelligence_agent:
+  display_name: "Permit Intelligence Agent"
+  version: "1.8.0"
+  owner: "team-operations@sentinel.io"
+  description: "Operational safety analyzer for work permits."
+  consumes:
+    topics:
+      - sentinel.permit.events.v1
+      - sentinel.zone.analysis.v1
+      - sentinel.zone.state.v1
+    schemas:
+      - permit_event
+      - zone_analysis
+      - zone_state
+  produces:
+    topics:
+      - sentinel.permit.analysis.v1
+    schemas:
+      - permit_analysis
+  dependencies:
+    - zone_intelligence_agent
+  sla:
+    max_processing_time_ms: 800
+    min_confidence: 0.7
+  scaling:
+    min_replicas: 3
+    max_replicas: 50
+
+worker_safety_agent:
+  display_name: "Worker Safety Agent"
+  version: "3.1.2"
+  owner: "team-hse@sentinel.io"
+  description: "Human safety monitoring — PPE, location, biometrics."
+  consumes:
+    topics:
+      - sentinel.worker.events.v1
+      - sentinel.zone.analysis.v1
+      - sentinel.zone.state.v1
+    schemas:
+      - worker_event
+      - zone_analysis
+      - zone_state
+  produces:
+    topics:
+      - sentinel.worker.analysis.v1
+    schemas:
+      - worker_analysis
+  dependencies:
+    - zone_intelligence_agent
+  sla:
+    max_processing_time_ms: 300
+    min_confidence: 0.8
+  scaling:
+    min_replicas: 5
+    max_replicas: 200
+
+maintenance_intelligence_agent:
+  display_name: "Maintenance Intelligence Agent"
+  version: "1.5.4"
+  owner: "team-reliability@sentinel.io"
+  description: "Equipment health intelligence and failure prediction."
+  consumes:
+    topics:
+      - sentinel.maintenance.events.v1
+    schemas:
+      - maintenance_event
+  produces:
+    topics:
+      - sentinel.maintenance.analysis.v1
+      - sentinel.prediction.v1
+      - sentinel.equipment.state.v1
+    schemas:
+      - maintenance_analysis
+      - prediction_result
+      - equipment_state
+  dependencies:
+    - none
+  sla:
+    max_processing_time_ms: 1000
+    min_confidence: 0.65
+  scaling:
+    min_replicas: 3
+    max_replicas: 50
+
+environmental_intelligence_agent:
+  display_name: "Environmental Intelligence Agent"
+  version: "2.0.3"
+  owner: "team-hse@sentinel.io"
+  description: "Environmental hazard monitoring — gas, temperature, pressure."
+  consumes:
+    topics:
+      - sentinel.sensor.events.v1
+      - sentinel.environmental.events.v1
+    schemas:
+      - sensor_event
+      - environmental_event
+  produces:
+    topics:
+      - sentinel.environment.analysis.v1
+    schemas:
+      - environment_analysis
+  dependencies:
+    - none
+  sla:
+    max_processing_time_ms: 400
+    min_confidence: 0.75
+  scaling:
+    min_replicas: 5
+    max_replicas: 200
+
+incident_intelligence_agent:
+  display_name: "Incident Intelligence Agent"
+  version: "1.3.0"
+  owner: "team-knowledge@sentinel.io"
+  description: "Historical safety memory using vector DB, RAG, and knowledge graph."
+  consumes:
+    topics:
+      - sentinel.risk.score.v1
+      - sentinel.incident.events.v1
+    schemas:
+      - risk_score
+      - incident_event
+  produces:
+    topics:
+      - sentinel.incident.analysis.v1
+    schemas:
+      - incident_analysis
+  dependencies:
+    - risk_orchestrator_agent
+  sla:
+    max_processing_time_ms: 2000
+    min_confidence: 0.5
+  scaling:
+    min_replicas: 2
+    max_replicas: 20
+  external_dependencies:
+    - vector_db: incident_memory, safety_documents
+    - knowledge_graph: neo4j-cluster
+
+risk_orchestrator_agent:
+  display_name: "Risk Orchestrator Agent"
+  version: "4.2.0"
+  owner: "team-core@sentinel.io"
+  description: "Main reasoning engine. Aggregates all agent outputs into final risk score."
+  consumes:
+    topics:
+      - sentinel.zone.analysis.v1
+      - sentinel.permit.analysis.v1
+      - sentinel.worker.analysis.v1
+      - sentinel.maintenance.analysis.v1
+      - sentinel.environment.analysis.v1
+      - sentinel.incident.analysis.v1
+    schemas:
+      - zone_analysis
+      - permit_analysis
+      - worker_analysis
+      - maintenance_analysis
+      - environment_analysis
+      - incident_analysis
+  produces:
+    topics:
+      - sentinel.risk.score.v1
+      - sentinel.site.state.v1
+    schemas:
+      - risk_score
+      - site_state
+  dependencies:
+    - zone_intelligence_agent
+    - permit_intelligence_agent
+    - worker_safety_agent
+    - maintenance_intelligence_agent
+    - environmental_intelligence_agent
+    - incident_intelligence_agent
+  sla:
+    max_processing_time_ms: 1500
+    min_confidence: 0.7
+  scaling:
+    min_replicas: 5
+    max_replicas: 100
+  criticality: "tier-0"   # outage = safety blind spot
+
+response_agent:
+  display_name: "Response Agent"
+  version: "1.9.1"
+  owner: "team-core@sentinel.io"
+  description: "Action planner. Proposes actions, never executes them directly."
+  consumes:
+    topics:
+      - sentinel.risk.score.v1
+    schemas:
+      - risk_score
+  produces:
+    topics:
+      - sentinel.action.request.v1
+    schemas:
+      - action_request
+  dependencies:
+    - risk_orchestrator_agent
+  sla:
+    max_processing_time_ms: 500
+    min_confidence: 0.7
+  scaling:
+    min_replicas: 3
+    max_replicas: 50
+  criticality: "tier-0"
+
+safety_copilot_agent:
+  display_name: "Safety Copilot Agent"
+  version: "2.1.0"
+  owner: "team-ux@sentinel.io"
+  description: "Human explanation interface. Generates explanations and answers operator queries."
+  consumes:
+    topics:
+      - sentinel.risk.score.v1
+      - sentinel.incident.analysis.v1
+      - sentinel.zone.analysis.v1
+    schemas:
+      - risk_score
+      - incident_analysis
+      - zone_analysis
+  produces:
+    topics:
+      - sentinel.explanation.v1
+    schemas:
+      - explanation
+  dependencies:
+    - risk_orchestrator_agent
+    - incident_intelligence_agent
+  sla:
+    max_processing_time_ms: 3000
+    min_confidence: 0.5
+  scaling:
+    min_replicas: 2
+    max_replicas: 30
+  external_dependencies:
+    - llm_provider: anthropic-claude
+
+action_gateway:
+  display_name: "Action Gateway"
+  version: "1.2.0"
+  owner: "team-core@sentinel.io"
+  description: "Executes approved actions. Only system with real-world execution authority."
+  consumes:
+    topics:
+      - sentinel.action.request.v1
+    schemas:
+      - action_request
+  produces:
+    topics:
+      - sentinel.action.result.v1
+    schemas:
+      - action_result
+  dependencies:
+    - response_agent
+  sla:
+    max_processing_time_ms: 2000
+    min_confidence: null  # not an analysis agent
+  scaling:
+    min_replicas: 3
+    max_replicas: 20
+  criticality: "tier-0"
+  notes: "Not an intelligence agent. Pure execution boundary with mandatory approval gate."

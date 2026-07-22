@@ -1,0 +1,37 @@
+{
+  "type": "record",
+  "name": "ActionRequest",
+  "namespace": "com.sentinel.events.actionrequest.v2",
+  "doc": "A proposed preventive/corrective action, owned by the Action Context (produced by Response Agent or a human operator). Action Event category. v2: renames 'justification' to 'explanation', per Artifact 6 §2's no-exceptions naming rule for decision-metadata fields (tracked as a known defect in Artifact 6 §14, applied here per Artifact 12 Phase 3 Step 10). This is a breaking change under contracts/versioning/compatibility_rules.md ('Removing or renaming a required field'), hence the new major version rather than an in-place edit -- v1 is left unchanged. explanation is REQUIRED, same as justification was in v1 -- only the field name changes, not its type, meaning, or requiredness.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "ActionRequest"},
+    {"name": "event_version", "type": "int", "default": 2},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": ["null", "string"], "default": null},
+    {"name": "partition_key", "type": "string", "doc": "target_ref of the action."},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "explanation", "type": "com.sentinel.common.ExplanationObject", "doc": "REQUIRED -- renamed from 'justification' in v1 (Artifact 6 §2/§14; Artifact 12 Step 10). Same type and requiredness as v1's justification field."},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "ActionRequestPayload",
+      "fields": [
+        {"name": "action_id", "type": "string"},
+        {"name": "risk_id", "type": "string", "doc": "REQUIRED -- every Action references exactly one RiskScore (Domain Invariant #3)."},
+        {"name": "action_type", "type": {"type": "enum", "name": "ActionType",
+          "symbols": ["ALERT_OPERATOR", "SUSPEND_PERMIT", "EVACUATE_ZONE", "NOTIFY_MAINTENANCE", "LOCKOUT_REQUEST"]}},
+        {"name": "target_ref", "type": "string"},
+        {"name": "requested_by", "type": "string", "doc": "'response-agent' or a human operator identity."},
+        {"name": "urgency", "type": {"type": "enum", "name": "ActionUrgency", "symbols": ["LOW", "MEDIUM", "HIGH", "IMMEDIATE"]}},
+        {"name": "requires_human_approval", "type": "boolean", "default": true, "doc": "Server-recomputed by the Action Policy Gateway from the whitelist policy; a client-supplied false is never trusted blindly."},
+        {"name": "requires_dual_control", "type": "boolean", "default": false}
+      ]
+    }}
+  ]
+}

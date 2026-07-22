@@ -1,0 +1,205 @@
+"""
+postgres_repositories.py
+
+Real SQLAlchemy 2.x repositories, tested against an actual live Postgres
+instance (this environment's local postgresql service). Implements the
+transaction-context-manager pattern and connection pooling from the Phase 1
+Core Runtime spec Part 5.2.
+"""
+from __future__ import annotations
+
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from typing import Iterator
+
+from sqlalchemy import Column, DateTime, Float, Integer, String, create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+
+from sentinel_common.errors import StateError
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class HelloSeenRecord(Base):
+    """The trivial table backing HelloAgent's Postgres-side proof (in
+    addition to the Redis-side proof) -- deliberately minimal, but a real
+    table with a real primary key and a real unique constraint."""
+    __tablename__ = "hello_seen_events"
+    __table_args__ = {"schema": "hello_agent"}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_id = Column(String, unique=True, nullable=False)
+    seen_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+def build_engine(dsn: str, pool_size: int = 5, max_overflow: int = 10):
+    return create_engine(dsn, pool_size=pool_size, max_overflow=max_overflow, pool_pre_ping=True)
+
+
+def build_session_factory(engine) -> sessionmaker:
+    return sessionmaker(bind=engine, expire_on_commit=False)
+
+
+class PostgresRepository:
+    def __init__(self, session_factory: sessionmaker):
+        self._session_factory = session_factory
+
+    @contextmanager
+    def transaction(self) -> Iterator[Session]:
+        session = self._session_factory()
+        try:
+            yield session
+            session.commit()
+        except SQLAlchemyError as e:
+            session.rollback()
+            raise StateError(f"Postgres transaction failed: {e}") from e
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+
+class HelloSeenRepository(PostgresRepository):
+    def ensure_schema(self) -> None:
+        """Creates the hello_agent schema/table if they don't exist. In a
+        real deployment this would be an Alembic migration
+        (Phase 1 Core Runtime spec Part 5.2); done inline here for a
+        minimal, dependency-free proof."""
+        with self.transaction() as session:
+            session.execute(text("CREATE SCHEMA IF NOT EXISTS hello_agent"))
+        # Scoped to this repo's own table -- Base is shared across repositories
+        # (ZoneRepository etc.), so an unscoped create_all() would also try to
+        # create zone_intelligence's tables/schema, which this repo shouldn't do.
+        Base.metadata.create_all(self._session_factory.kw["bind"], tables=[HelloSeenRecord.__table__])
+
+    def mark_seen(self, event_id: str) -> None:
+        with self.transaction() as session:
+            existing = session.query(HelloSeenRecord).filter_by(event_id=event_id).first()
+            if existing is None:
+                session.add(HelloSeenRecord(event_id=event_id, seen_at=datetime.now(timezone.utc)))
+            # idempotent: re-marking an already-seen event_id is a safe no-op
+
+    def count_seen(self) -> int:
+        with self.transaction() as session:
+            return session.query(HelloSeenRecord).count()
+
+    def was_seen(self, event_id: str) -> bool:
+        with self.transaction() as session:
+            return session.query(HelloSeenRecord).filter_by(event_id=event_id).first() is not None
+
+
+class ZoneHistoryRecord(Base):
+    """One row per ZoneState publish -- durable history beyond Redis's TTL
+    (spec Part 7's zone_history table). Redis stays the fast live-read
+    path; this is the audit trail Redis was never meant to keep forever."""
+    __tablename__ = "zone_history"
+    __table_args__ = {"schema": "zone_intelligence"}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    zone_state_event_id = Column(String, unique=True, nullable=False)
+    zone_id = Column(String, nullable=False, index=True)
+    site_id = Column(String, nullable=False)
+    occupancy_count = Column(Integer, nullable=False)
+    current_risk_level = Column(String, nullable=False)
+    recorded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AnomalyRecord(Base):
+    """One row per ZoneAnomalyDetected publish (spec Part 7's anomalies
+    table) -- durable beyond Redis, and queryable by zone/type/severity in
+    a way a Redis sorted set never could be."""
+    __tablename__ = "anomalies"
+    __table_args__ = {"schema": "zone_intelligence"}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    anomaly_event_id = Column(String, unique=True, nullable=False)
+    zone_id = Column(String, nullable=False, index=True)
+    anomaly_type = Column(String, nullable=False, index=True)
+    severity = Column(String, nullable=False)
+    rule_id = Column(String, nullable=True)
+    confidence = Column(Float, nullable=True)
+    summary = Column(String, nullable=True)
+    recorded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AuditEventRecord(Base):
+    """One row per processed input event (spec Part 7's audit_events table)
+    -- the "what did we receive and what did it cause" trail, independent
+    of whether that event produced an anomaly."""
+    __tablename__ = "audit_events"
+    __table_args__ = {"schema": "zone_intelligence"}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_event_id = Column(String, unique=True, nullable=False)
+    source_event_type = Column(String, nullable=False)
+    zone_id = Column(String, nullable=True, index=True)
+    correlation_id = Column(String, nullable=False)
+    causation_id = Column(String, nullable=True)
+    recorded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class ZoneRepository(PostgresRepository):
+    """Postgres-backed durability for Zone Intelligence Agent (spec Part 7 +
+    the ZoneRepository box in Part 17's class diagram). Redis
+    (ZoneStateRepository et al, in redis_repositories.py) remains the fast
+    live-read path with a TTL; this is what survives past that TTL and
+    supports queries Redis can't do (by zone over time, by anomaly type,
+    audit trail). Real SQLAlchemy 2.x, tested against a live local Postgres
+    -- same proof standard as HelloSeenRepository."""
+
+    def ensure_schema(self) -> None:
+        with self.transaction() as session:
+            session.execute(text("CREATE SCHEMA IF NOT EXISTS zone_intelligence"))
+        # Scoped to this repo's own tables -- Base is shared across repositories
+        # (HelloSeenRepository etc.), so an unscoped create_all() would also try
+        # to create hello_agent's table/schema, which this repo has no business doing.
+        Base.metadata.create_all(
+            self._session_factory.kw["bind"],
+            tables=[ZoneHistoryRecord.__table__, AnomalyRecord.__table__, AuditEventRecord.__table__],
+        )
+
+    def record_zone_state(self, zone_state_event_id: str, zone_id: str, site_id: str,
+                           occupancy_count: int, current_risk_level: str) -> None:
+        with self.transaction() as session:
+            existing = session.query(ZoneHistoryRecord).filter_by(zone_state_event_id=zone_state_event_id).first()
+            if existing is None:  # idempotent on the ZoneState's own event_id
+                session.add(ZoneHistoryRecord(
+                    zone_state_event_id=zone_state_event_id, zone_id=zone_id, site_id=site_id,
+                    occupancy_count=occupancy_count, current_risk_level=current_risk_level,
+                    recorded_at=datetime.now(timezone.utc),
+                ))
+
+    def record_anomaly(self, anomaly_event_id: str, zone_id: str, anomaly_type: str, severity: str,
+                        rule_id: str | None, confidence: float | None, summary: str | None) -> None:
+        with self.transaction() as session:
+            existing = session.query(AnomalyRecord).filter_by(anomaly_event_id=anomaly_event_id).first()
+            if existing is None:
+                session.add(AnomalyRecord(
+                    anomaly_event_id=anomaly_event_id, zone_id=zone_id, anomaly_type=anomaly_type,
+                    severity=severity, rule_id=rule_id, confidence=confidence, summary=summary,
+                    recorded_at=datetime.now(timezone.utc),
+                ))
+
+    def record_audit_event(self, source_event_id: str, source_event_type: str, zone_id: str | None,
+                            correlation_id: str, causation_id: str | None) -> None:
+        with self.transaction() as session:
+            existing = session.query(AuditEventRecord).filter_by(source_event_id=source_event_id).first()
+            if existing is None:
+                session.add(AuditEventRecord(
+                    source_event_id=source_event_id, source_event_type=source_event_type, zone_id=zone_id,
+                    correlation_id=correlation_id, causation_id=causation_id,
+                    recorded_at=datetime.now(timezone.utc),
+                ))
+
+    def count_anomalies_by_type(self, zone_id: str, anomaly_type: str) -> int:
+        with self.transaction() as session:
+            return session.query(AnomalyRecord).filter_by(zone_id=zone_id, anomaly_type=anomaly_type).count()
+
+    def get_zone_history(self, zone_id: str, limit: int = 100) -> list[ZoneHistoryRecord]:
+        with self.transaction() as session:
+            return (session.query(ZoneHistoryRecord).filter_by(zone_id=zone_id)
+                    .order_by(ZoneHistoryRecord.recorded_at.desc()).limit(limit).all())

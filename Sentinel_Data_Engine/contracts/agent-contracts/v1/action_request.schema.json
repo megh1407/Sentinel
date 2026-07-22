@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/agent-contracts/v1/action_request",
+  "title": "ActionRequest",
+  "description": "Action proposal from Response Agent. Never self-executing.",
+  "allOf": [{ "$ref": "../../events/v1/base_event.schema.json" }],
+  "required": ["action_id","requested_by","action_type","zone_id","risk_id","reason","approval_required","priority"],
+  "properties": {
+    "event_type":       { "const": "action.requested" },
+    "action_id":        { "type": "string", "format": "uuid" },
+    "requested_by":     { "type": "string" },
+    "action_type":      { "type": "string", "enum": ["evacuate_zone","lock_zone","suspend_permits","alert_workers","summon_emergency","isolate_equipment","ventilate","notify_supervisor","regulatory_report","send_copilot_alert"] },
+    "zone_id":          { "type": "string" },
+    "risk_id":          { "type": "string", "format": "uuid" },
+    "reason":           { "type": "string" },
+    "approval_required":{ "type": "boolean" },
+    "approver_roles":   { "type": "array", "items": { "type": "string" } },
+    "priority":         { "type": "string", "enum": ["low","normal","high","emergency"] },
+    "affected_workers": { "type": "array", "items": { "type": "string" } },
+    "affected_permits": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+    "parameters":       { "type": "object" },
+    "expires_at":       { "type": "string", "format": "date-time" }
+  }
+}

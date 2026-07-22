@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/events/v1/site_state",
+  "title": "SiteState",
+  "description": "Factory-wide operational state snapshot. Aggregated from all zone states. Used for site-level dashboards and cross-site coordination.",
+  "allOf": [{ "$ref": "./base_event.schema.json" }],
+  "properties": {
+    "event_type": { "const": "site.state_change" },
+    "payload": {
+      "type": "object",
+      "required": ["site_id","overall_state","zone_summary","changed_at"],
+      "properties": {
+        "site_id":         { "type": "string" },
+        "overall_state":   { "type": "string", "enum": ["normal","elevated","emergency","evacuating","shutdown","lockdown"] },
+        "previous_state":  { "type": "string" },
+        "zone_summary": {
+          "type": "object",
+          "description": "Count of zones in each state",
+          "properties": {
+            "safe":      {"type":"integer"}, "watch":    {"type":"integer"},
+            "warning":   {"type":"integer"}, "danger":   {"type":"integer"},
+            "evacuate":  {"type":"integer"}, "lockdown": {"type":"integer"}
+          }
+        },
+        "total_workers":    { "type": "integer" },
+        "highest_risk_zone":{ "type": "string" },
+        "highest_risk_score":{"type":"number"},
+        "active_incidents": { "type": "integer" },
+        "changed_at":       { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

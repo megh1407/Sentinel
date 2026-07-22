@@ -1,0 +1,36 @@
+{
+  "type": "record",
+  "name": "MaintenanceEvent",
+  "namespace": "com.sentinel.events.maintenanceevent.v1",
+  "doc": "Asset maintenance order lifecycle event, owned by the Maintenance Context. Ingestion Event category.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "MaintenanceEvent"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": "string"},
+    {"name": "partition_key", "type": "string", "doc": "Always equal to asset_id for this topic."},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "MaintenanceEventPayload",
+      "fields": [
+        {"name": "asset_id", "type": "string"},
+        {"name": "maintenance_order_id", "type": "string"},
+        {"name": "maintenance_type", "type": {"type": "enum", "name": "MaintenanceType",
+          "symbols": ["SCHEDULED", "CORRECTIVE", "EMERGENCY"]}},
+        {"name": "status", "type": {"type": "enum", "name": "MaintenanceStatus",
+          "symbols": ["SCHEDULED", "IN_PROGRESS", "COMPLETED", "OVERDUE"]}},
+        {"name": "overdue_days", "type": ["null", "int"], "default": null},
+        {"name": "criticality", "type": {"type": "enum", "name": "AssetCriticality",
+          "symbols": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]}}
+      ]
+    }}
+  ]
+}

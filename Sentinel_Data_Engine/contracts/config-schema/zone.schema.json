@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/config/v1/zone",
+  "title": "ZoneConfig",
+  "description": "Per-zone configuration including thresholds, occupancy limits, and hazard classification.",
+  "type": "object",
+  "required": ["zone_id","site_id","zone_type","max_occupancy"],
+  "properties": {
+    "zone_id":         { "type": "string" },
+    "site_id":         { "type": "string" },
+    "zone_code":       { "type": "string" },
+    "name":            { "type": "string" },
+    "zone_type":       { "type": "string", "enum": ["production","storage","maintenance","control","confined_space","high_voltage","chemical_storage","outdoor"] },
+    "floor":           { "type": "integer", "default": 0 },
+    "max_occupancy":   { "type": "integer" },
+    "hazard_classes":  { "type": "array", "items": { "type": "string" } },
+    "geofence":        { "type": "object", "description": "GeoJSON polygon" },
+    "thresholds": {
+      "type": "object",
+      "properties": {
+        "gas_ppm_limits":  { "type": "object", "additionalProperties": { "type": "number" } },
+        "temperature_max_c": { "type": "number" },
+        "noise_db_max":    { "type": "number" },
+        "occupancy_warning_pct": { "type": "number", "default": 0.8 }
+      }
+    },
+    "required_ppe":         { "type": "array", "items": { "type": "string" } },
+    "permit_types_allowed": { "type": "array", "items": { "type": "string" } },
+    "auto_evacuate_on_critical": { "type": "boolean", "default": true }
+  }
+}

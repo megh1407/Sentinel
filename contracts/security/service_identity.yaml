@@ -1,0 +1,64 @@
+# ============================================================
+# SENTINEL Service Identity
+# Every agent and service authenticates with a unique identity.
+# No shared credentials. mTLS between all internal services.
+# ============================================================
+
+identity_provider: "spiffe"   # SPIFFE/SPIRE for workload identity
+trust_domain: "sentinel.internal"
+
+service_identities:
+  zone_intelligence_agent:
+    spiffe_id: "spiffe://sentinel.internal/agent/zone-intelligence"
+    allowed_kafka_acls:
+      produce: ["sentinel.zone.analysis.v1", "sentinel.zone.state.v1"]
+      consume: ["sentinel.sensor.events.v1", "sentinel.worker.analysis.v1"]
+    cert_rotation_hours: 24
+
+  permit_intelligence_agent:
+    spiffe_id: "spiffe://sentinel.internal/agent/permit-intelligence"
+    allowed_kafka_acls:
+      produce: ["sentinel.permit.analysis.v1"]
+      consume: ["sentinel.permit.events.v1", "sentinel.zone.analysis.v1"]
+    cert_rotation_hours: 24
+
+  worker_safety_agent:
+    spiffe_id: "spiffe://sentinel.internal/agent/worker-safety"
+    allowed_kafka_acls:
+      produce: ["sentinel.worker.analysis.v1"]
+      consume: ["sentinel.worker.events.v1", "sentinel.zone.analysis.v1"]
+    cert_rotation_hours: 24
+
+  risk_orchestrator_agent:
+    spiffe_id: "spiffe://sentinel.internal/agent/risk-orchestrator"
+    allowed_kafka_acls:
+      produce: ["sentinel.risk.score.v1"]
+      consume: ["sentinel.zone.analysis.v1", "sentinel.permit.analysis.v1", "sentinel.worker.analysis.v1", "sentinel.maintenance.analysis.v1", "sentinel.environment.analysis.v1", "sentinel.incident.analysis.v1"]
+    cert_rotation_hours: 12   # tier-0, tighter rotation
+
+  response_agent:
+    spiffe_id: "spiffe://sentinel.internal/agent/response"
+    allowed_kafka_acls:
+      produce: ["sentinel.action.request.v1"]
+      consume: ["sentinel.risk.score.v1"]
+    cert_rotation_hours: 12
+
+  action_gateway:
+    spiffe_id: "spiffe://sentinel.internal/service/action-gateway"
+    allowed_kafka_acls:
+      produce: ["sentinel.action.result.v1"]
+      consume: ["sentinel.action.request.v1"]
+    cert_rotation_hours: 6    # highest sensitivity — real-world execution authority
+    requires_hardware_attestation: true
+
+  dashboard_service:
+    spiffe_id: "spiffe://sentinel.internal/service/dashboard"
+    allowed_kafka_acls:
+      produce: []
+      consume: ["sentinel.risk.score.v1", "sentinel.explanation.v1", "sentinel.action.result.v1", "sentinel.zone.state.v1", "sentinel.site.state.v1"]
+    cert_rotation_hours: 24
+
+mTLS:
+  enabled: true
+  min_tls_version: "1.3"
+  cipher_suites: ["TLS_AES_256_GCM_SHA384"]

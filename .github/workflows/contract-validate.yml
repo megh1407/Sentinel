@@ -1,0 +1,63 @@
+# contract-validate.yml
+#
+# Phase 1 (Pre-Merge) gate -- Artifact 10 (Validation & Compliance Architecture),
+# Section 2. Blocks a PR from merging.
+#
+# Scope, deliberately narrow: this workflow currently runs exactly Phase 0's
+# minimal pipeline -- Avro syntax and envelope-conformance checking -- per
+# Artifact 12 (Migration Plan), Phase 1, step 2: "Replace the three empty
+# .github/workflows/*.yml files with Phase 0's minimal pipeline."
+#
+# Artifact 10 Section 2 lists many more Phase 1 checks (naming validation,
+# documentation validation, cross-reference validation, category-declaration,
+# decision-metadata completeness, provenance completeness, etc.). Those are
+# NOT included here because their underlying tools do not exist in the
+# repository yet -- naming_lint.py, cross_reference_check.py, and
+# lineage_check.py are built in later migration steps (Artifact 12 Phase 2
+# step 8 and Phase 5 step 17 expand this workflow once their tooling exists).
+# Referencing a script that doesn't exist would recreate the exact "CI
+# reference points at infrastructure that does not exist" problem Artifact 1
+# and Artifact 10's Founding Evidence identified -- so this workflow only
+# calls tools that are real today.
+#
+# Filename matches Artifact 13's target tree (.github/workflows/contract-validate.yml,
+# "# Phase 1 gate"), since this workflow will be expanded in place rather than
+# replaced again once later migration steps land.
+
+name: Contract Validate
+
+on:
+  pull_request:
+    paths:
+      - "contracts/**"
+      - "schema_loader.py"
+      - "envelope_conformance_lint.py"
+  push:
+    branches:
+      - main
+    paths:
+      - "contracts/**"
+      - "schema_loader.py"
+      - "envelope_conformance_lint.py"
+
+jobs:
+  validate:
+    name: Avro syntax + envelope conformance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Avro syntax check (schema_loader.py)
+        run: python schema_loader.py
+
+      - name: Envelope-conformance check (envelope_conformance_lint.py)
+        run: python envelope_conformance_lint.py

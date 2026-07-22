@@ -1,0 +1,32 @@
+{
+  "type": "record",
+  "name": "WorkerStatusUpdated",
+  "namespace": "com.sentinel.events.workerstatusupdated.v1",
+  "doc": "Materialized worker-state projection, published by the Worker Intelligence Agent. Not decision-bearing (a status projection, not a finding).",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "WorkerStatusUpdated"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string", "default": "worker-intelligence-agent"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": ["null", "string"], "default": null},
+    {"name": "partition_key", "type": "string"},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "WorkerStatusUpdatedPayload",
+      "fields": [
+        {"name": "worker_id", "type": "string"},
+        {"name": "status", "type": {"type": "enum", "name": "WorkerStatus",
+          "symbols": ["ACTIVE", "FATIGUED", "PPE_NON_COMPLIANT", "LONE_WORKER", "OFFLINE"]}},
+        {"name": "fatigue_score", "type": ["null", "double"], "default": null, "doc": "In [0,1], null if not computed."},
+        {"name": "last_updated", "type": {"type": "long", "logicalType": "timestamp-millis"}}
+      ]
+    }}
+  ]
+}

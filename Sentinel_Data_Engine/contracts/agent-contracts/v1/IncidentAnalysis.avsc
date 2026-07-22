@@ -1,0 +1,300 @@
+{
+  "type": "record",
+  "name": "IncidentAnalysis",
+  "namespace": "com.sentinel.agentcontracts.incidentanalysis.v1",
+  "doc": "Avro translation of contracts/agent-contracts/v1/incident_analysis.schema.json per Artifact 7 \u00a73's inlining pattern (Artifact 12 Phase 3 Step 9).",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "IncidentAnalysis"
+    },
+    {
+      "name": "event_version",
+      "type": "int",
+      "default": 1
+    },
+    {
+      "name": "event_timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "correlation_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "causation_id",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "producer_service",
+      "type": "string"
+    },
+    {
+      "name": "producer_version",
+      "type": "string"
+    },
+    {
+      "name": "site_id",
+      "type": "string"
+    },
+    {
+      "name": "zone_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "partition_key",
+      "type": "string"
+    },
+    {
+      "name": "trace_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "metadata",
+      "type": "com.sentinel.common.Metadata"
+    },
+    {
+      "name": "agent_id",
+      "type": "string"
+    },
+    {
+      "name": "agent_version",
+      "type": "string"
+    },
+    {
+      "name": "input_events",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      }
+    },
+    {
+      "name": "result_type",
+      "type": "string",
+      "default": "incident_analysis"
+    },
+    {
+      "name": "confidence",
+      "type": "double",
+      "doc": "Range [0,1]."
+    },
+    {
+      "name": "processing_time_ms",
+      "type": "int"
+    },
+    {
+      "name": "error",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "IncidentAnalysisError",
+          "fields": [
+            {
+              "name": "code",
+              "type": "string"
+            },
+            {
+              "name": "message",
+              "type": "string"
+            },
+            {
+              "name": "retryable",
+              "type": "boolean"
+            }
+          ]
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "explanation",
+      "type": "com.sentinel.common.ExplanationObject",
+      "doc": "REQUIRED -- no finding without a populated explanation (Domain Invariant #4; Artifact 7 \u00a78)."
+    },
+    {
+      "name": "payload",
+      "type": {
+        "type": "record",
+        "name": "IncidentAnalysisPayload",
+        "fields": [
+          {
+            "name": "risk_score",
+            "type": "double",
+            "doc": "Range [0,100]."
+          },
+          {
+            "name": "confidence",
+            "type": "double",
+            "doc": "Range [0,1]."
+          },
+          {
+            "name": "similar_incidents",
+            "type": {
+              "type": "array",
+              "items": {
+                "type": "record",
+                "name": "SimilarIncident",
+                "fields": [
+                  {
+                    "name": "incident_id",
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "similarity",
+                    "type": [
+                      "null",
+                      "double"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "incident_type",
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "severity",
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "site_id",
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "occurred_at",
+                    "type": [
+                      "null",
+                      {
+                        "type": "long",
+                        "logicalType": "timestamp-millis"
+                      }
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "outcome",
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "root_cause",
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "vector_source",
+                    "type": [
+                      "null",
+                      {
+                        "type": "enum",
+                        "name": "VectorSource",
+                        "symbols": [
+                          "incident_memory",
+                          "safety_documents"
+                        ]
+                      }
+                    ],
+                    "default": null
+                  }
+                ]
+              }
+            },
+            "default": []
+          },
+          {
+            "name": "historical_evidence",
+            "type": {
+              "type": "array",
+              "items": "string"
+            },
+            "default": []
+          },
+          {
+            "name": "knowledge_graph_paths",
+            "type": {
+              "type": "array",
+              "items": "string"
+            },
+            "default": [],
+            "doc": "Each element is a JSON-encoded object -- the source schema declares this as an open/untyped object with no properties, and Avro has no 'any' type."
+          },
+          {
+            "name": "evidence",
+            "type": {
+              "type": "array",
+              "items": "string"
+            }
+          },
+          {
+            "name": "recommendations",
+            "type": {
+              "type": "array",
+              "items": "string"
+            }
+          },
+          {
+            "name": "analyzed_at",
+            "type": {
+              "type": "long",
+              "logicalType": "timestamp-millis"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

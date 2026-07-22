@@ -1,0 +1,322 @@
+{
+  "type": "record",
+  "name": "ZoneAnalysis",
+  "namespace": "com.sentinel.agentcontracts.zoneanalysis.v1",
+  "doc": "Avro translation of contracts/agent-contracts/v1/zone_analysis.schema.json per Artifact 7 \u00a73's inlining pattern (Artifact 12 Phase 3 Step 9). Avro has no inheritance, so the BaseEvent envelope and the AgentResult provenance/decision-metadata fields (formerly reached via allOf -> agent_result.schema.json) are inlined directly here rather than referenced.",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "UUIDv7, unique per event instance."
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "ZoneAnalysis"
+    },
+    {
+      "name": "event_version",
+      "type": "int",
+      "default": 1
+    },
+    {
+      "name": "event_timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "correlation_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "causation_id",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "producer_service",
+      "type": "string"
+    },
+    {
+      "name": "producer_version",
+      "type": "string"
+    },
+    {
+      "name": "site_id",
+      "type": "string"
+    },
+    {
+      "name": "zone_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "partition_key",
+      "type": "string"
+    },
+    {
+      "name": "trace_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "metadata",
+      "type": "com.sentinel.common.Metadata"
+    },
+    {
+      "name": "agent_id",
+      "type": "string"
+    },
+    {
+      "name": "agent_version",
+      "type": "string",
+      "doc": "Semver, e.g. '1.4.2'."
+    },
+    {
+      "name": "input_events",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      }
+    },
+    {
+      "name": "result_type",
+      "type": "string",
+      "default": "zone_analysis"
+    },
+    {
+      "name": "confidence",
+      "type": "double",
+      "doc": "Agent's overall confidence in this result, in [0,1]."
+    },
+    {
+      "name": "processing_time_ms",
+      "type": "int"
+    },
+    {
+      "name": "error",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "ZoneAnalysisError",
+          "fields": [
+            {
+              "name": "code",
+              "type": "string"
+            },
+            {
+              "name": "message",
+              "type": "string"
+            },
+            {
+              "name": "retryable",
+              "type": "boolean"
+            }
+          ]
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "explanation",
+      "type": "com.sentinel.common.ExplanationObject",
+      "doc": "REQUIRED -- no finding without a populated explanation (Domain Invariant #4; Artifact 7 \u00a78)."
+    },
+    {
+      "name": "payload",
+      "type": {
+        "type": "record",
+        "name": "ZoneAnalysisPayload",
+        "fields": [
+          {
+            "name": "zone_state",
+            "type": {
+              "type": "enum",
+              "name": "ZoneState",
+              "symbols": [
+                "safe",
+                "watch",
+                "warning",
+                "danger",
+                "evacuate",
+                "lockdown"
+              ]
+            }
+          },
+          {
+            "name": "risk_score",
+            "type": "double",
+            "doc": "Range [0,100]."
+          },
+          {
+            "name": "confidence",
+            "type": "double",
+            "doc": "Range [0,1]."
+          },
+          {
+            "name": "risk_factors",
+            "type": {
+              "type": "array",
+              "items": "string"
+            }
+          },
+          {
+            "name": "anomalies",
+            "type": {
+              "type": "array",
+              "items": {
+                "type": "record",
+                "name": "ZoneAnomalyDetail",
+                "fields": [
+                  {
+                    "name": "anomaly_type",
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "description",
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "severity",
+                    "type": [
+                      "null",
+                      {
+                        "type": "enum",
+                        "name": "ZoneAnomalySeverity",
+                        "symbols": [
+                          "low",
+                          "medium",
+                          "high",
+                          "critical"
+                        ]
+                      }
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "sensor_ids",
+                    "type": {
+                      "type": "array",
+                      "items": "string"
+                    },
+                    "default": []
+                  }
+                ]
+              }
+            },
+            "default": []
+          },
+          {
+            "name": "worker_count",
+            "type": [
+              "null",
+              "int"
+            ],
+            "default": null
+          },
+          {
+            "name": "equipment_ids",
+            "type": {
+              "type": "array",
+              "items": "string"
+            },
+            "default": []
+          },
+          {
+            "name": "environmental_conditions",
+            "type": [
+              "null",
+              {
+                "type": "record",
+                "name": "EnvironmentalConditions",
+                "fields": [
+                  {
+                    "name": "temperature_c",
+                    "type": [
+                      "null",
+                      "double"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "humidity_pct",
+                    "type": [
+                      "null",
+                      "double"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "gas_levels",
+                    "type": [
+                      "null",
+                      {
+                        "type": "map",
+                        "values": "double"
+                      }
+                    ],
+                    "default": null
+                  }
+                ]
+              }
+            ],
+            "default": null
+          },
+          {
+            "name": "evidence",
+            "type": {
+              "type": "array",
+              "items": "string"
+            }
+          },
+          {
+            "name": "recommendations",
+            "type": {
+              "type": "array",
+              "items": "string"
+            }
+          },
+          {
+            "name": "analyzed_at",
+            "type": {
+              "type": "long",
+              "logicalType": "timestamp-millis"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

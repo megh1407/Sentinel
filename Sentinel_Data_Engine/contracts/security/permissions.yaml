@@ -1,0 +1,65 @@
+# ============================================================
+# SENTINEL Permissions Matrix
+# Format: role -> [allowed actions]
+# ============================================================
+
+operator:
+  - view_dashboard
+  - view_alerts
+  - view_zone_state
+  - view_risk_score
+  - query_copilot
+  - acknowledge_alert
+
+safety_officer:
+  - approve_action          # action_request.approval_required = true
+  - reject_action
+  - suspend_permit
+  - view_incident_history
+  - escalate_incident
+  - override_zone_lockout   # requires secondary confirmation
+
+manager:
+  - view_site_reports
+  - view_all_zones_in_site
+  - export_audit_log
+  - configure_zone_thresholds
+  - assign_operator_roles
+
+auditor:
+  - view_audit_log
+  - view_all_historical_data
+  - export_compliance_report
+  # explicitly NO write permissions anywhere
+
+admin:
+  - configure_global_rules
+  - configure_agent_parameters
+  - manage_users
+  - manage_site_config
+  - rotate_secrets
+  - deploy_model_version
+  - view_everything
+
+system_agent:
+  - publish_to_owned_topics      # see agent-registry/agents.yaml "produces"
+  - consume_from_subscribed_topics  # see agent-registry/agents.yaml "consumes"
+  - read_redis_scoped_keys
+  - write_audit_log
+
+# ============================================================
+# Explicit denials (defense in depth — must be enforced even
+# if a role inheritance bug would otherwise grant access)
+# ============================================================
+denials:
+  operator:
+    - approve_action
+    - configure_anything
+    - execute_action_directly   # no role may bypass Action Gateway
+  auditor:
+    - approve_action
+    - reject_action
+    - any_write_operation
+  system_agent:
+    - publish_to_unowned_topics
+    - read_other_agents_internal_state

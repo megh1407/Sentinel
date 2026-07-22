@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/events/v1/zone_state",
+  "title": "ZoneState",
+  "description": "Snapshot of a zone's operational state. Published whenever state changes. Consumed by permit agent, worker agent, and dashboard. Also written to Redis.",
+  "allOf": [{ "$ref": "./base_event.schema.json" }],
+  "properties": {
+    "event_type": { "const": "zone.state_change" },
+    "payload": {
+      "type": "object",
+      "required": ["zone_id","state","previous_state","reason","worker_count","changed_at"],
+      "properties": {
+        "zone_id":        { "type": "string" },
+        "state":          { "type": "string", "enum": ["safe","watch","warning","danger","evacuate","lockdown","maintenance","decommissioned"] },
+        "previous_state": { "type": "string" },
+        "reason":         { "type": "string" },
+        "worker_count":   { "type": "integer", "minimum": 0 },
+        "active_permits": { "type": "integer", "minimum": 0 },
+        "active_hazards": { "type": "array", "items": { "type": "string" } },
+        "risk_score":     { "type": "number", "minimum": 0, "maximum": 100 },
+        "changed_at":     { "type": "string", "format": "date-time" },
+        "changed_by":     { "type": "string", "description": "agent_id or operator_id that triggered state change" },
+        "auto_revert_at": { "type": "string", "format": "date-time", "description": "If set, zone reverts to safe state automatically at this time" }
+      }
+    }
+  }
+}

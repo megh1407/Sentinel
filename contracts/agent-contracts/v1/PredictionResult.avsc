@@ -1,0 +1,259 @@
+{
+  "type": "record",
+  "name": "PredictionResult",
+  "namespace": "com.sentinel.agentcontracts.predictionresult.v1",
+  "doc": "Avro translation of contracts/agent-contracts/v1/prediction_result.schema.json per Artifact 7 \u00a73's inlining pattern (Artifact 12 Phase 3 Step 9). Forward-looking forecast contract, distinct from current risk_score -- used by maintenance failure prediction, environmental dispersion forecasts, and risk trajectory projections.",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "PredictionResult"
+    },
+    {
+      "name": "event_version",
+      "type": "int",
+      "default": 1
+    },
+    {
+      "name": "event_timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "correlation_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "causation_id",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "producer_service",
+      "type": "string"
+    },
+    {
+      "name": "producer_version",
+      "type": "string"
+    },
+    {
+      "name": "site_id",
+      "type": "string"
+    },
+    {
+      "name": "zone_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "partition_key",
+      "type": "string"
+    },
+    {
+      "name": "trace_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "metadata",
+      "type": "com.sentinel.common.Metadata"
+    },
+    {
+      "name": "agent_id",
+      "type": "string"
+    },
+    {
+      "name": "agent_version",
+      "type": "string"
+    },
+    {
+      "name": "input_events",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      }
+    },
+    {
+      "name": "result_type",
+      "type": "string",
+      "default": "prediction_result"
+    },
+    {
+      "name": "confidence",
+      "type": "double",
+      "doc": "Range [0,1]. Duplicated at payload.confidence in the source schema; preserved as-is for translation fidelity."
+    },
+    {
+      "name": "processing_time_ms",
+      "type": "int"
+    },
+    {
+      "name": "error",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "PredictionResultError",
+          "fields": [
+            {
+              "name": "code",
+              "type": "string"
+            },
+            {
+              "name": "message",
+              "type": "string"
+            },
+            {
+              "name": "retryable",
+              "type": "boolean"
+            }
+          ]
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "explanation",
+      "type": "com.sentinel.common.ExplanationObject",
+      "doc": "REQUIRED -- no finding without a populated explanation (Domain Invariant #4; Artifact 7 \u00a78)."
+    },
+    {
+      "name": "payload",
+      "type": {
+        "type": "record",
+        "name": "PredictionResultPayload",
+        "fields": [
+          {
+            "name": "prediction_type",
+            "type": {
+              "type": "enum",
+              "name": "PredictionType",
+              "symbols": [
+                "equipment_failure",
+                "hazard_spread",
+                "risk_trajectory",
+                "permit_conflict_forecast",
+                "worker_exposure"
+              ]
+            }
+          },
+          {
+            "name": "horizon_minutes",
+            "type": "double",
+            "doc": "How far into the future this prediction looks."
+          },
+          {
+            "name": "probability",
+            "type": "double",
+            "doc": "Range [0,1]."
+          },
+          {
+            "name": "predicted_outcome",
+            "type": "string"
+          },
+          {
+            "name": "predicted_value",
+            "type": [
+              "null",
+              "double"
+            ],
+            "default": null,
+            "doc": "Numeric forecast value if applicable, e.g. predicted risk_score."
+          },
+          {
+            "name": "confidence_interval",
+            "type": [
+              "null",
+              {
+                "type": "record",
+                "name": "ConfidenceInterval",
+                "fields": [
+                  {
+                    "name": "lower",
+                    "type": [
+                      "null",
+                      "double"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "upper",
+                    "type": [
+                      "null",
+                      "double"
+                    ],
+                    "default": null
+                  }
+                ]
+              }
+            ],
+            "default": null
+          },
+          {
+            "name": "contributing_signals",
+            "type": {
+              "type": "array",
+              "items": "string"
+            },
+            "default": []
+          },
+          {
+            "name": "model_name",
+            "type": [
+              "null",
+              "string"
+            ],
+            "default": null
+          },
+          {
+            "name": "model_version",
+            "type": [
+              "null",
+              "string"
+            ],
+            "default": null
+          },
+          {
+            "name": "confidence",
+            "type": "double",
+            "doc": "Range [0,1]."
+          },
+          {
+            "name": "generated_at",
+            "type": {
+              "type": "long",
+              "logicalType": "timestamp-millis"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

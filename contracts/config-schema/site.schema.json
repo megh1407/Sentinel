@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/config/v1/site",
+  "title": "SiteConfig",
+  "description": "Per-site configuration. Overrides global config where specified.",
+  "type": "object",
+  "required": ["site_id","site_code","timezone","zones"],
+  "properties": {
+    "site_id":   { "type": "string", "format": "uuid" },
+    "site_code": { "type": "string" },
+    "name":      { "type": "string" },
+    "country":   { "type": "string" },
+    "timezone":  { "type": "string" },
+    "zones":     { "type": "array", "items": { "type": "string" }, "description": "zone_ids belonging to this site" },
+    "risk_threshold_overrides": {
+      "type": "object",
+      "properties": { "watch": {"type":"number"}, "warning": {"type":"number"}, "danger": {"type":"number"}, "evacuate": {"type":"number"} }
+    },
+    "regulatory_jurisdiction": { "type": "string", "description": "e.g. OSHA-US, COSHH-UK, DGMS-IN" },
+    "emergency_contacts": {
+      "type": "array",
+      "items": { "type": "object", "properties": { "role": {"type":"string"}, "name": {"type":"string"}, "phone": {"type":"string"} } }
+    },
+    "shift_schedule": { "type": "object", "properties": { "shift_count": {"type":"integer"}, "shift_hours": {"type":"array","items":{"type":"string"}} } },
+    "active": { "type": "boolean", "default": true }
+  }
+}

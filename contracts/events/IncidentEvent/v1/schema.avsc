@@ -1,0 +1,36 @@
+{
+  "type": "record",
+  "name": "IncidentEvent",
+  "namespace": "com.sentinel.events.incidentevent.v1",
+  "doc": "Incident report/update/close event, owned by the Incident Context. Ingestion Event category (raw ground-truth fact, not a decision -- carries no ExplanationObject).",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "IncidentEvent"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": "string"},
+    {"name": "partition_key", "type": "string", "doc": "Always equal to zone_id for this topic."},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "IncidentEventPayload",
+      "fields": [
+        {"name": "incident_id", "type": "string"},
+        {"name": "incident_type", "type": "string"},
+        {"name": "severity", "type": {"type": "enum", "name": "IncidentSeverity",
+          "symbols": ["NEAR_MISS", "MINOR", "MAJOR", "CRITICAL"]}},
+        {"name": "description", "type": ["null", "string"], "default": null, "doc": "Size-capped at 4000 chars by producer-side validation, not enforced at the schema level."},
+        {"name": "linked_permit_id", "type": ["null", "string"], "default": null},
+        {"name": "linked_worker_ids", "type": {"type": "array", "items": "string"}, "default": []},
+        {"name": "linked_asset_ids", "type": {"type": "array", "items": "string"}, "default": []},
+        {"name": "auto_drafted", "type": "boolean", "default": false, "doc": "True when created automatically by Incident Intelligence Agent from a CRITICAL RiskScore, pending human confirmation."}
+      ]
+    }}
+  ]
+}

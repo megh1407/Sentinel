@@ -1,0 +1,293 @@
+{
+  "type": "record",
+  "name": "EnvironmentAnalysis",
+  "namespace": "com.sentinel.agentcontracts.environmentanalysis.v1",
+  "doc": "Avro translation of contracts/agent-contracts/v1/environment_analysis.schema.json per Artifact 7 \u00a73's inlining pattern (Artifact 12 Phase 3 Step 9).",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "EnvironmentAnalysis"
+    },
+    {
+      "name": "event_version",
+      "type": "int",
+      "default": 1
+    },
+    {
+      "name": "event_timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "correlation_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "causation_id",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "producer_service",
+      "type": "string"
+    },
+    {
+      "name": "producer_version",
+      "type": "string"
+    },
+    {
+      "name": "site_id",
+      "type": "string"
+    },
+    {
+      "name": "zone_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "partition_key",
+      "type": "string"
+    },
+    {
+      "name": "trace_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "metadata",
+      "type": "com.sentinel.common.Metadata"
+    },
+    {
+      "name": "agent_id",
+      "type": "string"
+    },
+    {
+      "name": "agent_version",
+      "type": "string"
+    },
+    {
+      "name": "input_events",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      }
+    },
+    {
+      "name": "result_type",
+      "type": "string",
+      "default": "environment_analysis"
+    },
+    {
+      "name": "confidence",
+      "type": "double",
+      "doc": "Range [0,1]."
+    },
+    {
+      "name": "processing_time_ms",
+      "type": "int"
+    },
+    {
+      "name": "error",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "EnvironmentAnalysisError",
+          "fields": [
+            {
+              "name": "code",
+              "type": "string"
+            },
+            {
+              "name": "message",
+              "type": "string"
+            },
+            {
+              "name": "retryable",
+              "type": "boolean"
+            }
+          ]
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "explanation",
+      "type": "com.sentinel.common.ExplanationObject",
+      "doc": "REQUIRED -- no finding without a populated explanation (Domain Invariant #4; Artifact 7 \u00a78)."
+    },
+    {
+      "name": "payload",
+      "type": {
+        "type": "record",
+        "name": "EnvironmentAnalysisPayload",
+        "fields": [
+          {
+            "name": "risk_score",
+            "type": "double",
+            "doc": "Range [0,100]."
+          },
+          {
+            "name": "confidence",
+            "type": "double",
+            "doc": "Range [0,1]."
+          },
+          {
+            "name": "hazards",
+            "type": {
+              "type": "array",
+              "items": {
+                "type": "record",
+                "name": "HazardReading",
+                "fields": [
+                  {
+                    "name": "hazard_type",
+                    "type": [
+                      "null",
+                      {
+                        "type": "enum",
+                        "name": "HazardType",
+                        "symbols": [
+                          "flammable_gas",
+                          "toxic_gas",
+                          "oxygen_deficiency",
+                          "high_temperature",
+                          "high_pressure",
+                          "chemical_exposure",
+                          "radiation"
+                        ]
+                      }
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "measured_value",
+                    "type": [
+                      "null",
+                      "double"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "unit",
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "threshold_ppm",
+                    "type": [
+                      "null",
+                      "double"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "threshold_breach",
+                    "type": [
+                      "null",
+                      "boolean"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "trend",
+                    "type": [
+                      "null",
+                      {
+                        "type": "enum",
+                        "name": "HazardTrend",
+                        "symbols": [
+                          "rising",
+                          "stable",
+                          "falling"
+                        ]
+                      }
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "sensor_ids",
+                    "type": {
+                      "type": "array",
+                      "items": "string"
+                    },
+                    "default": []
+                  }
+                ]
+              }
+            },
+            "default": []
+          },
+          {
+            "name": "evacuation_required",
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "default": null
+          },
+          {
+            "name": "affected_zones",
+            "type": {
+              "type": "array",
+              "items": "string"
+            },
+            "default": []
+          },
+          {
+            "name": "evidence",
+            "type": {
+              "type": "array",
+              "items": "string"
+            }
+          },
+          {
+            "name": "recommendations",
+            "type": {
+              "type": "array",
+              "items": "string"
+            }
+          },
+          {
+            "name": "analyzed_at",
+            "type": {
+              "type": "long",
+              "logicalType": "timestamp-millis"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

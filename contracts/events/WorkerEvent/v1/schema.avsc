@@ -1,0 +1,33 @@
+{
+  "type": "record",
+  "name": "WorkerEvent",
+  "namespace": "com.sentinel.events.workerevent.v1",
+  "doc": "Pseudonymous worker presence/PPE event, owned by the Worker Context. Ingestion Event category. MUST NOT contain raw PII fields -- enforced by codegen lint against a banned-field-name list (name, email, phone, ssn, badge_photo, etc).",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "WorkerEvent"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": "string"},
+    {"name": "partition_key", "type": "string", "doc": "Always equal to zone_id for this topic."},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "WorkerEventPayload",
+      "fields": [
+        {"name": "worker_id", "type": "string", "doc": "Pseudonymous internal reference (UUID), resolved to identity only via sentinel_security, never carried here."},
+        {"name": "event_kind", "type": {"type": "enum", "name": "WorkerEventKind",
+          "symbols": ["ZONE_ENTRY", "ZONE_EXIT", "PPE_STATUS", "BIOMETRIC_ALERT"]}},
+        {"name": "ppe_status", "type": ["null", {"type": "map", "values": "boolean"}], "default": null,
+          "doc": "e.g. {'helmet': true, 'gas_monitor': true, 'harness': false}. Null unless event_kind == PPE_STATUS."},
+        {"name": "location", "type": ["null", "com.sentinel.common.GeoLocation"], "default": null}
+      ]
+    }}
+  ]
+}

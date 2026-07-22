@@ -1,0 +1,36 @@
+# docker-compose.yml (integration_testing override)
+#
+# NOT a standalone stack -- always used together with the real
+# scripts/dev-env/docker-compose.yml, e.g.:
+#
+#   docker compose -f ../../scripts/dev-env/docker-compose.yml -f docker-compose.yml up -d
+#
+# (run_demo.py does exactly this.) Duplicating that file's service
+# definitions here would create two sources of truth for the same Kafka/
+# Redis/Postgres config; this file only ADDS healthchecks on top of the
+# real ones, so `docker compose ... up -d --wait` can block until Kafka is
+# actually accepting connections instead of just "container started".
+# Deleting tools/integration_testing/ removes only this override -- the
+# real dev-env stack definition is untouched.
+services:
+  kafka:
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  redis:
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

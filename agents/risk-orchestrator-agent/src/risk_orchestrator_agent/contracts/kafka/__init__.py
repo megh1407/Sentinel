@@ -1,0 +1,31 @@
+"""Kafka topic-name constants for this agent's registered contract."""
+
+from risk_orchestrator_agent.contracts.kafka.topics import (
+    ENVIRONMENT_ANALYSIS_TOPIC,
+    INBOUND_TOPICS,
+    INCIDENT_ANALYSIS_TOPIC,
+    MAINTENANCE_ANALYSIS_TOPIC,
+    OUTBOUND_TOPICS,
+    PERMIT_ANALYSIS_TOPIC,
+    PREDICTION_TOPIC,
+    RISK_SCORE_TOPIC,
+    SITE_STATE_TOPIC,
+    WORKER_ANALYSIS_TOPIC,
+    ZONE_ANALYSIS_TOPIC,
+    dlq_topic_for,
+)
+
+__all__ = [
+    "ENVIRONMENT_ANALYSIS_TOPIC",
+    "INBOUND_TOPICS",
+    "INCIDENT_ANALYSIS_TOPIC",
+    "MAINTENANCE_ANALYSIS_TOPIC",
+    "OUTBOUND_TOPICS",
+    "PERMIT_ANALYSIS_TOPIC",
+    "PREDICTION_TOPIC",
+    "RISK_SCORE_TOPIC",
+    "SITE_STATE_TOPIC",
+    "WORKER_ANALYSIS_TOPIC",
+    "ZONE_ANALYSIS_TOPIC",
+    "dlq_topic_for",
+]

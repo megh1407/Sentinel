@@ -1,0 +1,144 @@
+{
+  "type": "record",
+  "name": "ActionResult",
+  "namespace": "com.sentinel.agentcontracts.actionresult.v1",
+  "doc": "Avro translation of contracts/agent-contracts/v1/action_result.schema.json per Artifact 7 \u00a73's inlining pattern (Artifact 12 Phase 3 Step 9). Execution outcome from the Action Gateway. Note: the source JSON Schema chains via allOf -> base_event.schema.json directly, NOT via agent_result.schema.json -- it has no agent_id/confidence/explanation/payload wrapper in the source, so this translation inlines only the BaseEvent envelope plus the record's own flat fields, faithfully, without adding fields the source never had.",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "action.result"
+    },
+    {
+      "name": "event_version",
+      "type": "int",
+      "default": 1
+    },
+    {
+      "name": "event_timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "correlation_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "causation_id",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "producer_service",
+      "type": "string"
+    },
+    {
+      "name": "producer_version",
+      "type": "string"
+    },
+    {
+      "name": "site_id",
+      "type": "string"
+    },
+    {
+      "name": "zone_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "partition_key",
+      "type": "string"
+    },
+    {
+      "name": "trace_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "metadata",
+      "type": "com.sentinel.common.Metadata"
+    },
+    {
+      "name": "action_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "status",
+      "type": {
+        "type": "enum",
+        "name": "ActionResultStatus",
+        "symbols": [
+          "pending_approval",
+          "approved",
+          "rejected",
+          "executing",
+          "completed",
+          "failed",
+          "expired"
+        ]
+      }
+    },
+    {
+      "name": "executed_by",
+      "type": "string"
+    },
+    {
+      "name": "audit_reference",
+      "type": "string"
+    },
+    {
+      "name": "result_at",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "rejection_reason",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "execution_details",
+      "type": [
+        "null",
+        {
+          "type": "array",
+          "items": "string"
+        }
+      ],
+      "default": null,
+      "doc": "Each element is a JSON-encoded object -- the source schema declares this as an open/untyped object with no properties, and Avro has no 'any' type."
+    }
+  ]
+}

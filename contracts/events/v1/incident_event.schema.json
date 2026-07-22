@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/events/v1/incident_event",
+  "title": "IncidentEvent",
+  "description": "Historical and live safety incident records ingested into SENTINEL memory.",
+  "allOf": [{ "$ref": "./base_event.schema.json" }],
+  "properties": {
+    "event_type": { "type": "string", "enum": ["incident.reported","incident.updated","incident.closed","incident.investigation_complete","incident.near_miss"] },
+    "payload": {
+      "type": "object",
+      "required": ["incident_id","incident_type","severity","description"],
+      "properties": {
+        "incident_id":      { "type": "string", "format": "uuid" },
+        "incident_type":    { "type": "string", "enum": ["gas_leak","fire","chemical_spill","equipment_failure","worker_injury","near_miss","environmental","explosion","structural","flood"] },
+        "severity":         { "type": "string", "enum": ["minor","moderate","major","critical","catastrophic"] },
+        "description":      { "type": "string" },
+        "root_cause":       { "type": "string" },
+        "contributing_factors": { "type": "array", "items": { "type": "string" } },
+        "injuries":         { "type": "integer", "minimum": 0 },
+        "fatalities":       { "type": "integer", "minimum": 0 },
+        "remediation_taken":{ "type": "array", "items": { "type": "string" } },
+        "regulatory_report_required": { "type": "boolean" },
+        "regulatory_reference": { "type": "string" },
+        "investigation_findings": { "type": "string" }
+      }
+    }
+  }
+}

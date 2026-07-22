@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/simulation/v1/scenario",
+  "title": "SimulationScenario",
+  "description": "Defines a reproducible test scenario — sequence of synthetic events injected into staging Kafka topics to validate agent behavior, train new operators, and regression-test the Risk Orchestrator before production deployment.",
+  "type": "object",
+  "required": ["scenario_id","name","scenario_type","events","expected_outcomes"],
+  "properties": {
+    "scenario_id":   { "type": "string" },
+    "name":          { "type": "string" },
+    "description":   { "type": "string" },
+    "scenario_type": { "type": "string", "enum": ["gas_leak","fire","equipment_failure","permit_conflict","worker_emergency","multi_zone_cascade","false_positive_test"] },
+    "based_on_incident_id": { "type": "string", "description": "If derived from a real historical incident" },
+    "site_id":       { "type": "string" },
+    "zone_id":       { "type": "string" },
+    "events": {
+      "type": "array",
+      "description": "Ordered list of synthetic events to inject, each with a relative offset",
+      "items": {
+        "type": "object",
+        "required": ["offset_seconds","event_type","payload"],
+        "properties": {
+          "offset_seconds": { "type": "number", "description": "Seconds from scenario start" },
+          "event_type":     { "type": "string" },
+          "topic":          { "type": "string" },
+          "payload":        { "type": "object" }
+        }
+      }
+    },
+    "expected_outcomes": {
+      "type": "object",
+      "properties": {
+        "expected_risk_score_range": { "type": "object", "properties": { "min": {"type":"number"}, "max": {"type":"number"} } },
+        "expected_severity":         { "type": "string" },
+        "expected_actions":          { "type": "array", "items": { "type": "string" } },
+        "max_time_to_detection_seconds": { "type": "number" },
+        "expected_agent_confidence_min": { "type": "number" }
+      }
+    },
+    "tags":      { "type": "array", "items": { "type": "string" } },
+    "created_by":{ "type": "string" },
+    "created_at":{ "type": "string", "format": "date-time" }
+  }
+}

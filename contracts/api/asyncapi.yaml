@@ -1,0 +1,120 @@
+asyncapi: 2.6.0
+info:
+  title: SENTINEL Real-Time Event Streams
+  version: 1.0.0
+  description: >
+    WebSocket and Kafka-backed async contracts for live dashboard updates,
+    alerts, and risk score streaming. Mirrors the Kafka topic contracts in
+    topics/kafka_topics.yaml but exposed for external/frontend consumption
+    via a WebSocket gateway that bridges Kafka to browser clients.
+
+servers:
+  websocket:
+    url: wss://stream.sentinel.io/v1
+    protocol: ws
+    description: WebSocket gateway bridging internal Kafka topics to dashboard clients
+
+channels:
+  risk-updates/{zone_id}:
+    description: Live risk score updates for a subscribed zone
+    parameters:
+      zone_id:
+        schema: { type: string }
+    subscribe:
+      summary: Receive risk score updates as they're computed
+      message:
+        $ref: '#/components/messages/RiskScoreUpdate'
+
+  alerts/{site_id}:
+    description: Site-wide critical alerts requiring immediate operator attention
+    parameters:
+      site_id:
+        schema: { type: string }
+    subscribe:
+      summary: Receive push alerts (mirrors Redis pub/sub sentinel:alert:*)
+      message:
+        $ref: '#/components/messages/AlertMessage'
+
+  actions/pending/{site_id}:
+    description: Pending action approvals requiring human sign-off
+    parameters:
+      site_id:
+        schema: { type: string }
+    subscribe:
+      summary: Receive new action requests needing approval
+      message:
+        $ref: '#/components/messages/PendingAction'
+
+  explanations/{zone_id}:
+    description: Safety Copilot generated explanations for a zone
+    parameters:
+      zone_id:
+        schema: { type: string }
+    subscribe:
+      summary: Receive explanation events as Safety Copilot generates them
+      message:
+        $ref: '#/components/messages/ExplanationMessage'
+
+  evacuation/{site_id}:
+    description: Site-wide evacuation broadcast channel — highest priority
+    parameters:
+      site_id:
+        schema: { type: string }
+    subscribe:
+      summary: Receive evacuation orders (mirrors Redis sentinel:evacuation:*)
+      message:
+        $ref: '#/components/messages/EvacuationBroadcast'
+
+components:
+  messages:
+    RiskScoreUpdate:
+      payload:
+        type: object
+        properties:
+          risk_id: { type: string }
+          zone_id: { type: string }
+          score: { type: number }
+          severity: { type: string }
+          explanation_summary: { type: string }
+          computed_at: { type: string, format: date-time }
+
+    AlertMessage:
+      payload:
+        type: object
+        properties:
+          alert_id: { type: string }
+          zone_id: { type: string }
+          severity: { type: string }
+          message: { type: string }
+          risk_id: { type: string }
+          triggered_at: { type: string, format: date-time }
+
+    PendingAction:
+      payload:
+        type: object
+        properties:
+          action_id: { type: string }
+          action_type: { type: string }
+          zone_id: { type: string }
+          priority: { type: string }
+          reason: { type: string }
+          approver_roles: { type: array, items: { type: string } }
+          expires_at: { type: string, format: date-time }
+
+    ExplanationMessage:
+      payload:
+        type: object
+        properties:
+          explanation_id: { type: string }
+          zone_id: { type: string }
+          summary: { type: string }
+          recommended_actions: { type: array, items: { type: string } }
+
+    EvacuationBroadcast:
+      payload:
+        type: object
+        properties:
+          site_id: { type: string }
+          affected_zones: { type: array, items: { type: string } }
+          reason: { type: string }
+          issued_at: { type: string, format: date-time }

@@ -1,0 +1,7 @@
+{
+  "type": "enum",
+  "name": "Environment",
+  "namespace": "com.sentinel.common",
+  "doc": "Deployment environment that produced an event. Extracted from Metadata.avsc per Artifact 5 §4 so it is independently named and versioned rather than an uncontrolled dependency nested inside another record.",
+  "symbols": ["DEV", "STAGING", "PROD"]
+}

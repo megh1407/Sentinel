@@ -1,0 +1,33 @@
+{
+  "type": "record",
+  "name": "EmbeddingsCreated",
+  "namespace": "com.sentinel.events.embeddingscreated.v1",
+  "doc": "Published by the Knowledge Context Agent whenever a new vector embedding is stored. Not decision-bearing.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "EmbeddingsCreated"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string", "default": "knowledge-context-agent"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": ["null", "string"], "default": null},
+    {"name": "partition_key", "type": "string"},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "EmbeddingsCreatedPayload",
+      "fields": [
+        {"name": "collection_name", "type": {"type": "enum", "name": "VectorCollection",
+          "symbols": ["INCIDENT_REPORTS_EMBEDDINGS", "MAINTENANCE_NOTES_EMBEDDINGS", "SAFETY_PROCEDURE_EMBEDDINGS"]}},
+        {"name": "vector_id", "type": "string"},
+        {"name": "source_id", "type": "string"},
+        {"name": "source_type", "type": "string"},
+        {"name": "embedding_model_version", "type": "string"}
+      ]
+    }}
+  ]
+}

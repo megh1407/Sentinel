@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "ExplanationObject",
+  "namespace": "com.sentinel.common",
+  "doc": "Mandatory 'why' attached to every decision-bearing event (RiskScore, AgentResult, PredictionResult). No agent may emit a finding without a populated ExplanationObject.",
+  "fields": [
+    {"name": "summary", "type": "string", "doc": "One-sentence, deterministically-reconstructable human-readable explanation."},
+    {"name": "confidence", "type": "com.sentinel.common.ConfidenceScore", "doc": "Overall confidence in this explanation."},
+    {"name": "evidence", "type": {"type": "array", "items": "com.sentinel.common.EvidenceItem"}, "doc": "Non-empty whenever the parent finding is not NO_FINDING."},
+    {"name": "reasoning_steps", "type": {"type": "array", "items": "string"}, "default": [], "doc": "Ordered, human-readable reasoning chain: individual contributors -> fired compound rules -> final band decision."},
+    {"name": "risk_contributors", "type": {"type": "array", "items": "com.sentinel.common.RiskContributor"}, "default": [], "doc": "Empty for non-risk-scoring explanations (e.g. a PredictionResult may omit these)."},
+    {"name": "rule_metadata", "type": ["null", {"type": "map", "values": "string"}], "default": null, "doc": "rule_id/rule_version and any other rule-derivation metadata, when this explanation is rule-derived."},
+    {"name": "generated_at", "type": {"type": "long", "logicalType": "timestamp-millis"}, "doc": "When this explanation was computed. Always <= the parent event's event_timestamp."}
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/config/v1/agent",
+  "title": "AgentConfig",
+  "description": "Runtime configuration for an agent instance. Distinct from agent-registry/agents.yaml which defines topology — this controls runtime tuning.",
+  "type": "object",
+  "required": ["agent_id","confidence_threshold","retry_limit"],
+  "properties": {
+    "agent_id":             { "type": "string" },
+    "confidence_threshold": { "type": "number", "minimum": 0, "maximum": 1, "description": "Below this, agent flags low-confidence result rather than publishing normally" },
+    "retry_limit":          { "type": "integer", "default": 3 },
+    "retry_backoff_ms":     { "type": "integer", "default": 200 },
+    "timeout_ms":           { "type": "integer", "default": 5000 },
+    "model": {
+      "type": "object",
+      "properties": {
+        "provider": { "type": "string", "enum": ["anthropic","openai","internal","rule_based"] },
+        "model_name": { "type": "string" },
+        "model_version": { "type": "string" },
+        "temperature": { "type": "number", "default": 0.2 }
+      }
+    },
+    "feature_weights": { "type": "object", "additionalProperties": { "type": "number" }, "description": "Per-factor weights used in scoring, e.g. for Risk Orchestrator contributors" },
+    "circuit_breaker": {
+      "type": "object",
+      "properties": {
+        "error_threshold_pct": { "type": "number", "default": 0.1 },
+        "open_duration_ms":    { "type": "integer", "default": 30000 }
+      }
+    },
+    "log_level": { "type": "string", "enum": ["debug","info","warn","error"], "default": "info" }
+  }
+}

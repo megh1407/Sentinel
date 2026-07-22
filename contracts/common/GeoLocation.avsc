@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "GeoLocation",
+  "namespace": "com.sentinel.common",
+  "doc": "Optional physical coordinate, used where a site's zone geometry requires a point reference (e.g. a specific sensor mount point within a zone polygon).",
+  "fields": [
+    {"name": "latitude", "type": "double"},
+    {"name": "longitude", "type": "double"},
+    {"name": "elevation_meters", "type": ["null", "double"], "default": null}
+  ]
+}

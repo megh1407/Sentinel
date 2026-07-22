@@ -1,0 +1,31 @@
+{
+  "type": "record",
+  "name": "EquipmentRiskDetected",
+  "namespace": "com.sentinel.events.equipmentriskdetected.v1",
+  "doc": "Published by the Equipment Intelligence Agent when equipment shows an elevated risk signal. Decision-bearing: explanation REQUIRED.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "EquipmentRiskDetected"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string", "default": "equipment-intelligence-agent"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": ["null", "string"], "default": null},
+    {"name": "partition_key", "type": "string"},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "explanation", "type": "com.sentinel.common.ExplanationObject"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "EquipmentRiskDetectedPayload",
+      "fields": [
+        {"name": "asset_id", "type": "string"},
+        {"name": "risk_type", "type": {"type": "enum", "name": "EquipmentRiskType",
+          "symbols": ["PREDICTED_FAILURE", "ABNORMAL_VIBRATION", "ABNORMAL_TEMPERATURE", "DEPENDENCY_RISK"]}}
+      ]
+    }}
+  ]
+}

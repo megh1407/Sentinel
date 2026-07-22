@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/events/v1/sensor_event",
+  "title": "SensorEvent",
+  "description": "Raw sensor reading from IoT device or SCADA system.",
+  "allOf": [{ "$ref": "./base_event.schema.json" }],
+  "properties": {
+    "event_type": { "const": "sensor.reading" },
+    "payload": {
+      "type": "object",
+      "required": ["sensor_id","sensor_type","value","unit"],
+      "properties": {
+        "sensor_id":        { "type": "string" },
+        "sensor_type":      { "type": "string", "enum": ["gas","temperature","pressure","humidity","vibration","smoke","chemical","radiation","noise","flow_rate"] },
+        "value":            { "type": "number" },
+        "unit":             { "type": "string" },
+        "threshold_min":    { "type": "number" },
+        "threshold_max":    { "type": "number" },
+        "threshold_breach": { "type": "boolean" },
+        "equipment_id":     { "type": "string" },
+        "location":         { "type": "object", "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "floor": { "type": "integer" } } },
+        "raw_payload":      { "type": "object" }
+      }
+    }
+  }
+}

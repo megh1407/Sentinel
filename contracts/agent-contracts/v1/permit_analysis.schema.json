@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/agent-contracts/v1/permit_analysis",
+  "title": "PermitAnalysis",
+  "allOf": [{ "$ref": "./agent_result.schema.json" }],
+  "properties": {
+    "result_type": { "const": "permit_analysis" },
+    "payload": {
+      "type": "object",
+      "required": ["permit_id","risk_score","confidence","conflicts","evidence","recommendations","analyzed_at"],
+      "properties": {
+        "permit_id":         { "type": "string", "format": "uuid" },
+        "permit_risk_level": { "type": "string", "enum": ["acceptable","elevated","high","unacceptable"] },
+        "risk_score":        { "type": "number", "minimum": 0, "maximum": 100 },
+        "confidence":        { "type": "number", "minimum": 0, "maximum": 1 },
+        "conflicts": { "type": "array", "items": { "type": "object", "properties": { "conflicting_permit_id": {"type":"string","format":"uuid"}, "conflict_type": {"type":"string"}, "severity": {"type":"string","enum":["advisory","warning","blocking"]} } } },
+        "zone_compatibility":    { "type": "boolean" },
+        "zone_risk_at_issuance": { "type": "number", "minimum": 0, "maximum": 100 },
+        "evidence":          { "type": "array", "items": { "type": "string" } },
+        "recommendations":   { "type": "array", "items": { "type": "string" } },
+        "analyzed_at":       { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

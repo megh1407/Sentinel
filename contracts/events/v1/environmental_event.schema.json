@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/events/v1/environmental_event",
+  "title": "EnvironmentalEvent",
+  "description": "Ambient environmental condition change events — separate from point sensor readings. Covers multi-sensor aggregated conditions, weather, and regulatory exceedances.",
+  "allOf": [{ "$ref": "./base_event.schema.json" }],
+  "properties": {
+    "event_type": { "type": "string", "enum": ["env.condition_change","env.regulatory_exceedance","env.weather_alert","env.air_quality","env.spill_detected"] },
+    "payload": {
+      "type": "object",
+      "required": ["condition_type","severity"],
+      "properties": {
+        "condition_type":    { "type": "string", "enum": ["air_quality","thermal","pressure_differential","chemical_concentration","noise_level","radiation_level","weather"] },
+        "severity":          { "type": "string", "enum": ["normal","elevated","warning","critical"] },
+        "affected_area_m2":  { "type": "number" },
+        "wind_direction":    { "type": "string" },
+        "wind_speed_ms":     { "type": "number" },
+        "dispersion_model":  { "type": "string", "description": "Name of dispersion model used, e.g. GAUSSIAN_PLUME" },
+        "predicted_spread":  { "type": "object", "description": "GeoJSON polygon of predicted hazard spread" },
+        "readings":          { "type": "array", "items": { "type": "object", "properties": { "sensor_id":{"type":"string"}, "value":{"type":"number"}, "unit":{"type":"string"} } } },
+        "regulatory_limit":  { "type": "number" },
+        "measured_value":    { "type": "number" },
+        "exceedance_factor": { "type": "number" }
+      }
+    }
+  }
+}

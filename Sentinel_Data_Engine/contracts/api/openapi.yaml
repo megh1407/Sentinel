@@ -1,0 +1,266 @@
+openapi: 3.0.3
+info:
+  title: SENTINEL Dashboard & Operator API
+  version: 1.0.0
+  description: >
+    REST surface for dashboard, operator actions, and Safety Copilot queries.
+    This is the only API surface external clients (dashboard, mobile, third-party
+    integrations) may call. All internal agent communication stays on Kafka.
+
+servers:
+  - url: https://api.sentinel.io/v1
+    description: Production
+
+security:
+  - bearerAuth: []
+
+paths:
+  /sites/{site_id}/zones:
+    get:
+      summary: List zones for a site with current state
+      tags: [Zones]
+      parameters:
+        - name: site_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Zone list with live state
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ZoneSummary' }
+
+  /zones/{zone_id}/risk:
+    get:
+      summary: Get current risk score for a zone (reads from Redis hot path)
+      tags: [Risk]
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Current risk score
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RiskScore' }
+        '404':
+          description: No active risk score (zone is safe / stale)
+
+  /zones/{zone_id}/risk/history:
+    get:
+      summary: Get historical risk scores for a zone
+      tags: [Risk]
+      parameters:
+        - name: zone_id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Time-series risk history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RiskScore' }
+
+  /actions:
+    get:
+      summary: List actions (pending, approved, executed)
+      tags: [Actions]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending_approval, approved, rejected, executing, completed, failed, expired] }
+        - name: zone_id
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Action list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Action' }
+
+  /actions/{action_id}/approve:
+    post:
+      summary: Approve a pending action (requires safety_officer or manager role)
+      tags: [Actions]
+      parameters:
+        - name: action_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                approver_comment: { type: string }
+      responses:
+        '200':
+          description: Action approved — publishes action_result to Kafka
+        '403':
+          description: Insufficient role
+        '409':
+          description: Action already resolved or expired
+
+  /actions/{action_id}/reject:
+    post:
+      summary: Reject a pending action
+      tags: [Actions]
+      parameters:
+        - name: action_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rejection_reason]
+              properties:
+                rejection_reason: { type: string }
+      responses:
+        '200':
+          description: Action rejected
+
+  /copilot/query:
+    post:
+      summary: Ask Safety Copilot a natural-language question
+      tags: [Copilot]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question: { type: string }
+                zone_id: { type: string, description: "Optional scoping context" }
+                language: { type: string, default: "en" }
+      responses:
+        '200':
+          description: Copilot explanation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Explanation' }
+
+  /incidents:
+    get:
+      summary: List historical incidents
+      tags: [Incidents]
+      parameters:
+        - name: site_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: severity
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Incident list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Incident' }
+
+  /audit/{correlation_id}/trace:
+    get:
+      summary: Full causal trace for a correlation_id — compliance and debugging
+      tags: [Audit]
+      parameters:
+        - name: correlation_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Ordered event trace
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AuditEntry' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ZoneSummary:
+      type: object
+      properties:
+        zone_id: { type: string }
+        name: { type: string }
+        state: { type: string, enum: [safe, watch, warning, danger, evacuate, lockdown] }
+        risk_score: { type: number }
+        worker_count: { type: integer }
+
+    RiskScore:
+      type: object
+      properties:
+        risk_id: { type: string, format: uuid }
+        zone_id: { type: string }
+        score: { type: number }
+        severity: { type: string }
+        contributors: { type: array, items: { type: object } }
+        explanation_summary: { type: string }
+        computed_at: { type: string, format: date-time }
+
+    Action:
+      type: object
+      properties:
+        action_id: { type: string, format: uuid }
+        action_type: { type: string }
+        status: { type: string }
+        priority: { type: string }
+        reason: { type: string }
+        zone_id: { type: string }
+        created_at: { type: string, format: date-time }
+
+    Explanation:
+      type: object
+      properties:
+        explanation_id: { type: string, format: uuid }
+        summary: { type: string }
+        evidence: { type: array, items: { type: object } }
+        reasoning_chain: { type: array, items: { type: object } }
+        recommended_actions: { type: array, items: { type: string } }
+
+    Incident:
+      type: object
+      properties:
+        incident_id: { type: string, format: uuid }
+        incident_type: { type: string }
+        severity: { type: string }
+        description: { type: string }
+        occurred_at: { type: string, format: date-time }
+
+    AuditEntry:
+      type: object
+      properties:
+        event_id: { type: string, format: uuid }
+        event_type: { type: string }
+        source: { type: string }
+        logged_at: { type: string, format: date-time }
+        payload_hash: { type: string }

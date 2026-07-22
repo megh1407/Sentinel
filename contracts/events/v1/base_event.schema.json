@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/events/v1/base_event",
+  "title": "BaseEvent",
+  "description": "Root contract inherited by every Kafka message in SENTINEL. Guarantees traceability, replay, and audit on every communication boundary.",
+  "type": "object",
+  "required": ["event_id","event_type","event_version","timestamp","source","site_id","zone_id","correlation_id","causation_id","schema_version"],
+  "properties": {
+    "event_id":       { "type": "string", "format": "uuid" },
+    "event_type":     { "type": "string", "description": "Dot-namespaced, e.g. sensor.reading or zone.analysis.complete" },
+    "event_version":  { "type": "integer", "minimum": 1 },
+    "timestamp":      { "type": "string", "format": "date-time" },
+    "source":         { "type": "string" },
+    "site_id":        { "type": "string" },
+    "zone_id":        { "type": "string" },
+    "correlation_id": { "type": "string", "format": "uuid" },
+    "causation_id":   { "type": "string", "format": "uuid" },
+    "schema_version": { "type": "string", "pattern": "^v[0-9]+$" }
+  },
+  "additionalProperties": true
+}

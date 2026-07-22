@@ -1,0 +1,8 @@
+# SENTINEL API Gateway (Phase 10 backend integration/API layer)
+# Everything else it imports (sentinel_eventbus, sentinel_agent_sdk,
+# sentinel_state, sentinel_contracts, the four agent packages) comes from
+# the repo root's own requirements.txt -- install that first:
+#   pip install -r ../../requirements.txt
+#   pip install -r requirements.txt
+fastapi>=0.110,<1
+uvicorn[standard]>=0.29,<1

@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/errors/v1/error",
+  "title": "SentinelError",
+  "description": "Universal error contract. Every service in SENTINEL must raise/serialize errors in this shape so any consumer can handle them uniformly — for DLQ messages, API error responses, and inter-agent error propagation.",
+  "type": "object",
+  "required": ["error_code", "message", "retryable", "severity", "occurred_at"],
+  "properties": {
+    "error_code": {
+      "type": "string",
+      "description": "Stable, namespaced error code, e.g. SENSOR_TIMEOUT, SCHEMA_VALIDATION_FAILED, AGENT_LOW_CONFIDENCE",
+      "examples": ["SENSOR_TIMEOUT","SCHEMA_VALIDATION_FAILED","KAFKA_PRODUCE_FAILED","AGENT_LOW_CONFIDENCE","DOWNSTREAM_UNAVAILABLE","AUTH_FAILED","RATE_LIMITED","VECTOR_DB_TIMEOUT","MODEL_INFERENCE_FAILED","ACTION_EXPIRED","APPROVAL_TIMEOUT"]
+    },
+    "message":     { "type": "string", "description": "Human-readable description" },
+    "retryable":   { "type": "boolean" },
+    "severity":    { "type": "string", "enum": ["debug","info","warning","error","critical"] },
+    "source":      { "type": "string", "description": "Service or agent that raised the error" },
+    "event_id":    { "type": "string", "format": "uuid", "description": "Originating event_id if applicable" },
+    "correlation_id": { "type": "string", "format": "uuid" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "context":     { "type": "object", "description": "Additional structured context for debugging" },
+    "stack_trace": { "type": "string", "description": "Only included in non-production environments" },
+    "retry_count": { "type": "integer", "default": 0 },
+    "max_retries": { "type": "integer", "default": 3 }
+  }
+}

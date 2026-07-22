@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/events/v1/permit_event",
+  "title": "PermitEvent",
+  "description": "Work permit lifecycle transition event.",
+  "allOf": [{ "$ref": "./base_event.schema.json" }],
+  "properties": {
+    "event_type": { "type": "string", "enum": ["permit.created","permit.approved","permit.activated","permit.suspended","permit.revoked","permit.expired"] },
+    "payload": {
+      "type": "object",
+      "required": ["permit_id","permit_type","lifecycle_status","issued_to"],
+      "properties": {
+        "permit_id":             { "type": "string", "format": "uuid" },
+        "permit_type":           { "type": "string", "enum": ["hot_work","confined_space","electrical","chemical","height","radiation","excavation","cold_work","line_break"] },
+        "lifecycle_status":      { "type": "string", "enum": ["draft","pending_approval","active","suspended","revoked","expired"] },
+        "issued_to":             { "type": "string" },
+        "issued_by":             { "type": "string" },
+        "valid_from":            { "type": "string", "format": "date-time" },
+        "valid_until":           { "type": "string", "format": "date-time" },
+        "zone_restrictions":     { "type": "array", "items": { "type": "string" } },
+        "concurrent_permits":    { "type": "array", "items": { "type": "string", "format": "uuid" } },
+        "conditions":            { "type": "array", "items": { "type": "string" } },
+        "gas_test_required":     { "type": "boolean" },
+        "isolation_points":      { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

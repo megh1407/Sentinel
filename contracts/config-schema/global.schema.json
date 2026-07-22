@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/config/v1/global",
+  "title": "GlobalConfig",
+  "description": "Platform-wide configuration applied across all sites unless overridden by site-level config.",
+  "type": "object",
+  "required": ["platform_version","default_risk_thresholds","kafka_defaults"],
+  "properties": {
+    "platform_version": { "type": "string" },
+    "default_risk_thresholds": {
+      "type": "object",
+      "properties": {
+        "watch":    { "type": "number", "default": 20 },
+        "warning":  { "type": "number", "default": 40 },
+        "danger":   { "type": "number", "default": 65 },
+        "evacuate": { "type": "number", "default": 85 }
+      }
+    },
+    "kafka_defaults": {
+      "type": "object",
+      "properties": {
+        "acks": { "type": "string", "default": "all" },
+        "retry_max": { "type": "integer", "default": 3 },
+        "schema_compatibility": { "type": "string", "enum": ["BACKWARD","FORWARD","FULL"], "default": "BACKWARD" }
+      }
+    },
+    "risk_score_ttl_seconds": { "type": "integer", "default": 30 },
+    "audit_retention_days":  { "type": "integer", "default": 2555, "description": "7 years — regulatory minimum" },
+    "supported_languages":   { "type": "array", "items": { "type": "string" }, "default": ["en"] },
+    "feature_flags":         { "type": "object", "additionalProperties": { "type": "boolean" } }
+  }
+}

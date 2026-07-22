@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/agent-contracts/v1/explanation",
+  "title": "Explanation",
+  "description": "Human-readable explanation from the Safety Copilot Agent for dashboard or operator query.",
+  "allOf": [{ "$ref": "../../events/v1/base_event.schema.json" }],
+  "required": ["explanation_id","summary","evidence","reasoning_chain","related_events","generated_at"],
+  "properties": {
+    "event_type":     { "const": "explanation.generated" },
+    "explanation_id": { "type": "string", "format": "uuid" },
+    "triggered_by":   { "type": "string", "enum": ["risk_score","operator_query","incident","scheduled"] },
+    "risk_id":        { "type": "string", "format": "uuid" },
+    "summary":        { "type": "string" },
+    "evidence":       { "type": "array", "items": { "type": "object", "properties": { "source": {"type":"string"}, "description": {"type":"string"}, "weight": {"type":"number"} } } },
+    "reasoning_chain":{ "type": "array", "items": { "type": "object", "properties": { "step": {"type":"integer"}, "agent": {"type":"string"}, "finding": {"type":"string"}, "contribution": {"type":"number"} } } },
+    "related_events":    { "type": "array", "items": { "type": "string", "format": "uuid" } },
+    "similar_incidents": { "type": "array", "items": { "type": "string" } },
+    "recommended_actions": { "type": "array", "items": { "type": "string" } },
+    "language":       { "type": "string", "default": "en" },
+    "generated_at":   { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/events/v1/worker_event",
+  "title": "WorkerEvent",
+  "description": "Worker location, PPE compliance, biometric, and evacuation events.",
+  "allOf": [{ "$ref": "./base_event.schema.json" }],
+  "properties": {
+    "event_type": { "type": "string", "enum": ["worker.location","worker.ppe","worker.biometric","worker.evacuation","worker.zone_entry","worker.zone_exit","worker.sos"] },
+    "payload": {
+      "type": "object",
+      "required": ["worker_id","event_subtype"],
+      "properties": {
+        "worker_id":    { "type": "string" },
+        "event_subtype":{ "type": "string" },
+        "role":         { "type": "string" },
+        "contractor":   { "type": "boolean" },
+        "location":     { "type": "object", "properties": { "x": {"type":"number"}, "y": {"type":"number"}, "floor": {"type":"integer"}, "accuracy_m": {"type":"number"} } },
+        "ppe_status":   { "type": "object", "properties": { "helmet": {"type":"boolean"}, "vest": {"type":"boolean"}, "gloves": {"type":"boolean"}, "boots": {"type":"boolean"}, "mask": {"type":"boolean"}, "harness": {"type":"boolean"}, "goggles": {"type":"boolean"}, "ear_protection": {"type":"boolean"} } },
+        "biometrics":   { "type": "object", "properties": { "heart_rate": {"type":"integer"}, "body_temp": {"type":"number"}, "fatigue_index": {"type":"number","minimum":0,"maximum":1}, "spo2": {"type":"number"} } },
+        "certifications": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,266 @@
+{
+  "type": "record",
+  "name": "WorkerAnalysis",
+  "namespace": "com.sentinel.agentcontracts.workeranalysis.v1",
+  "doc": "Avro translation of contracts/agent-contracts/v1/worker_analysis.schema.json per Artifact 7 \u00a73's inlining pattern (Artifact 12 Phase 3 Step 9).",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "WorkerAnalysis"
+    },
+    {
+      "name": "event_version",
+      "type": "int",
+      "default": 1
+    },
+    {
+      "name": "event_timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "correlation_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "causation_id",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "producer_service",
+      "type": "string"
+    },
+    {
+      "name": "producer_version",
+      "type": "string"
+    },
+    {
+      "name": "site_id",
+      "type": "string"
+    },
+    {
+      "name": "zone_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "partition_key",
+      "type": "string"
+    },
+    {
+      "name": "trace_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "metadata",
+      "type": "com.sentinel.common.Metadata"
+    },
+    {
+      "name": "agent_id",
+      "type": "string"
+    },
+    {
+      "name": "agent_version",
+      "type": "string"
+    },
+    {
+      "name": "input_events",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      }
+    },
+    {
+      "name": "result_type",
+      "type": "string",
+      "default": "worker_analysis"
+    },
+    {
+      "name": "confidence",
+      "type": "double",
+      "doc": "Range [0,1]."
+    },
+    {
+      "name": "processing_time_ms",
+      "type": "int"
+    },
+    {
+      "name": "error",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "WorkerAnalysisError",
+          "fields": [
+            {
+              "name": "code",
+              "type": "string"
+            },
+            {
+              "name": "message",
+              "type": "string"
+            },
+            {
+              "name": "retryable",
+              "type": "boolean"
+            }
+          ]
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "explanation",
+      "type": "com.sentinel.common.ExplanationObject",
+      "doc": "REQUIRED -- no finding without a populated explanation (Domain Invariant #4; Artifact 7 \u00a78)."
+    },
+    {
+      "name": "payload",
+      "type": {
+        "type": "record",
+        "name": "WorkerAnalysisPayload",
+        "fields": [
+          {
+            "name": "worker_id",
+            "type": "string"
+          },
+          {
+            "name": "risk_score",
+            "type": "double",
+            "doc": "Range [0,100]."
+          },
+          {
+            "name": "confidence",
+            "type": "double",
+            "doc": "Range [0,1]."
+          },
+          {
+            "name": "safety_status",
+            "type": {
+              "type": "enum",
+              "name": "WorkerSafetyStatus",
+              "symbols": [
+                "safe",
+                "at_risk",
+                "in_danger",
+                "unresponsive"
+              ]
+            }
+          },
+          {
+            "name": "ppe_compliance",
+            "type": [
+              "null",
+              "double"
+            ],
+            "default": null
+          },
+          {
+            "name": "ppe_violations",
+            "type": {
+              "type": "array",
+              "items": "string"
+            },
+            "default": []
+          },
+          {
+            "name": "zone_clearance",
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "default": null
+          },
+          {
+            "name": "proximity_alerts",
+            "type": {
+              "type": "array",
+              "items": {
+                "type": "record",
+                "name": "ProximityAlert",
+                "fields": [
+                  {
+                    "name": "hazard_type",
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "distance_m",
+                    "type": [
+                      "null",
+                      "double"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "safe_distance_m",
+                    "type": [
+                      "null",
+                      "double"
+                    ],
+                    "default": null
+                  }
+                ]
+              }
+            },
+            "default": []
+          },
+          {
+            "name": "evidence",
+            "type": {
+              "type": "array",
+              "items": "string"
+            }
+          },
+          {
+            "name": "recommendations",
+            "type": {
+              "type": "array",
+              "items": "string"
+            }
+          },
+          {
+            "name": "analyzed_at",
+            "type": {
+              "type": "long",
+              "logicalType": "timestamp-millis"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

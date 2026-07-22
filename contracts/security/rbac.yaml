@@ -1,0 +1,34 @@
+# ============================================================
+# SENTINEL RBAC — Role Definitions
+# ============================================================
+
+roles:
+  operator:
+    description: "Front-line operator monitoring dashboards in real time"
+    inherits: []
+    scope: "assigned_zones"
+
+  safety_officer:
+    description: "Authorized to approve safety-critical actions"
+    inherits: [operator]
+    scope: "assigned_sites"
+
+  manager:
+    description: "Site-level oversight and reporting authority"
+    inherits: [safety_officer]
+    scope: "assigned_sites"
+
+  auditor:
+    description: "Read-only access to all historical data and audit trails — no operational control"
+    inherits: []
+    scope: "all_sites"
+
+  admin:
+    description: "Full platform configuration access including agent and rule configuration"
+    inherits: [manager]
+    scope: "all_sites"
+
+  system_agent:
+    description: "Non-human service identity used by agents to authenticate to internal APIs"
+    inherits: []
+    scope: "topic_scoped"

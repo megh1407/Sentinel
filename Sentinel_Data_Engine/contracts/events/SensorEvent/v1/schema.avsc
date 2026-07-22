@@ -1,0 +1,36 @@
+{
+  "type": "record",
+  "name": "SensorEvent",
+  "namespace": "com.sentinel.events.sensorevent.v1",
+  "doc": "Raw sensor reading, owned by the Environmental Context. Ingestion Event category.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "SensorEvent"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": "string"},
+    {"name": "partition_key", "type": "string", "doc": "Always equal to zone_id for this topic."},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "SensorEventPayload",
+      "fields": [
+        {"name": "sensor_id", "type": "string"},
+        {"name": "sensor_type", "type": {"type": "enum", "name": "SensorType",
+          "symbols": ["GAS", "TEMPERATURE", "PRESSURE", "VIBRATION", "PROXIMITY", "SMOKE", "HUMIDITY"]}},
+        {"name": "value", "type": "double"},
+        {"name": "unit", "type": "string"},
+        {"name": "threshold_breached", "type": "boolean"},
+        {"name": "sensor_status", "type": {"type": "enum", "name": "SensorStatus", "symbols": ["ACTIVE", "FAULTY", "DECOMMISSIONED"]}, "default": "ACTIVE"},
+        {"name": "location", "type": ["null", "com.sentinel.common.GeoLocation"], "default": null},
+        {"name": "raw_metadata", "type": {"type": "map", "values": "string"}, "default": {}}
+      ]
+    }}
+  ]
+}

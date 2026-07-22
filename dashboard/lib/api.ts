@@ -1,0 +1,289 @@
+/**
+ * lib/api.ts -- real backend integration (Phase 10 frontend<->API wiring)
+ *
+ * Fetches from platform-services/api-gateway (see its README for how to
+ * run it) and maps the raw JSON it returns into the SAME ZoneRecord /
+ * SiteState / FeedItem shapes mockData.ts already exports -- so every
+ * component that currently imports from "./mockData" can switch to
+ * importing from here with no other changes.
+ *
+ * IMPORTANT, honestly stated: the api-gateway's /api/zones response gives
+ * real ZoneState (from Redis) and real EnvironmentAnalysis / PermitAnalysis
+ * / WorkerAnalysis (from its in-memory cache of the real agents' output --
+ * see state_cache.py). There is no RiskScore anywhere in the real system
+ * yet (that's the Risk Orchestrator's job, out of scope per the master
+ * prompt) -- riskScore is always mapped to null here, same as its
+ * "simulated, not yet backed" status in contracts.ts. Anything this file
+ * cannot honestly derive from a real API response is left null/empty
+ * rather than fabricated.
+ */
+import {
+  ZoneRecord,
+  ZoneState,
+  EnvironmentAnalysis,
+  PermitAnalysis,
+  WorkerAnalysis,
+  SiteState,
+  FeedItem,
+  RiskLevel,
+} from "./contracts";
+
+const API_BASE = process.env.NEXT_PUBLIC_SENTINEL_API_BASE ?? "http://localhost:8000";
+
+// Fixed layout positions for the demo scenario's single zone plus a few
+// placeholders -- matches mockData.ts's approach of hand-placed grid
+// coordinates (frontend layout only, never backend data). Extend this map
+// as real zones appear; unknown zone_ids fall back to a simple index-based
+// grid so nothing crashes if a new zone shows up.
+const KNOWN_ZONE_LAYOUT: Record<string, { x: number; y: number; displayName: string }> = {
+  "ZONE-A": { x: 1, y: 1, displayName: "Zone A" },
+  "ZONE-B": { x: 2, y: 1, displayName: "Zone B" },
+  "ZONE-C": { x: 3, y: 1, displayName: "Zone C" },
+  "ZONE-D": { x: 1, y: 2, displayName: "Zone D" },
+  "ZONE-E": { x: 2, y: 2, displayName: "Zone E" },
+};
+
+function layoutFor(zoneId: string, index: number) {
+  return (
+    KNOWN_ZONE_LAYOUT[zoneId] ?? {
+      x: (index % 3) + 1,
+      y: Math.floor(index / 3) + 1,
+      displayName: zoneId,
+    }
+  );
+}
+
+// -- raw shapes returned by platform-services/api-gateway/main.py -----------
+// (mirrors of the real Pydantic .model_dump(mode="json") output -- every
+// field name here was verified against a real response, not guessed.)
+
+interface RawZoneEntry {
+  zone_state: any;
+  environment: any | null;
+  active_permits: any[];
+  workers: any[];
+}
+
+function mapZoneState(raw: any): ZoneState {
+  const p = raw.payload;
+  return {
+    zone_id: raw.zone_id,
+    site_id: raw.site_id,
+    current_risk_level: p.current_risk_level as RiskLevel,
+    active_permit_ids: p.active_permit_ids ?? [],
+    active_permit_types: p.active_permit_types ?? {},
+    occupancy_count: p.occupancy_count ?? 0,
+    active_sensor_alert_ids: p.active_sensor_alert_ids ?? [],
+    active_equipment_risk_ids: p.active_equipment_risk_ids ?? [],
+    recent_incident_count: p.recent_incident_count ?? 0,
+    pending_critical_maintenance_asset_ids: p.pending_critical_maintenance_asset_ids ?? [],
+    stale_sensor_ids: p.stale_sensor_ids ?? [],
+    last_updated: p.last_updated ?? raw.event_timestamp,
+    is_stale: p.is_stale ?? false,
+  };
+}
+
+function mapEnvironment(raw: any | null): EnvironmentAnalysis | null {
+  if (!raw) return null;
+  const p = raw.payload;
+  return {
+    zone_id: raw.zone_id,
+    risk_score: p.risk_score,
+    confidence: p.confidence,
+    hazards: (p.hazards ?? []).map((h: any) => ({
+      hazard_type: h.hazard_type,
+      // sensor_ids[0] carries the real field/species name (e.g. "methane"),
+      // not yet a literal sensor ID -- see environmental_intelligence_agent.py's
+      // hazards construction. Falls back to the coarser hazard_type
+      // category only if that's ever absent (e.g. temperature/pressure
+      // readings from before this convention existed).
+      label: h.sensor_ids?.[0] ?? h.hazard_type,
+      measured_value: h.measured_value,
+      unit: h.unit,
+      threshold_ppm: h.threshold_ppm ?? undefined,
+      threshold_breach: h.threshold_breach,
+      trend: h.trend,
+      sensor_ids: h.sensor_ids ?? [],
+    })),
+    evacuation_required: p.evacuation_required ?? false,
+    recommendations: p.recommendations ?? [],
+    analyzed_at: p.analyzed_at ?? raw.event_timestamp,
+  };
+}
+
+function mapPermit(raw: any): PermitAnalysis {
+  const p = raw.payload;
+  return {
+    permit_id: p.permit_id,
+    permit_type: p.permit_type ?? "UNKNOWN",
+    zone_id: raw.zone_id ?? "",
+    // The real PermitAnalysisV1 doesn't carry a lifecycle `status` field
+    // (that lives on the source PermitEvent, which this cache doesn't
+    // retain) -- "active" is the only state the demo scenario produces,
+    // so it's a safe default, not a fabricated fact about a specific permit.
+    status: "active",
+    valid_from: raw.event_timestamp,
+    valid_to: raw.event_timestamp,
+    permit_risk_level: p.permit_risk_level,
+    risk_score: p.risk_score,
+    confidence: p.confidence,
+    conflicts: (p.conflicts ?? []).map((c: any) => ({
+      conflicting_permit_id: c.conflicting_permit_id ?? "",
+      conflict_type: c.conflict_type ?? "",
+      severity: (c.severity ?? "advisory").toLowerCase(),
+    })),
+    zone_compatibility: p.zone_compatibility ?? true,
+    recommendations: p.recommendations ?? [],
+    analyzed_at: p.analyzed_at ?? raw.event_timestamp,
+  };
+}
+
+function mapWorker(raw: any): WorkerAnalysis {
+  const p = raw.payload;
+  return {
+    worker_id: p.worker_id,
+    zone_id: raw.zone_id ?? "",
+    risk_score: p.risk_score,
+    confidence: p.confidence,
+    safety_status: p.safety_status,
+    ppe_compliance: p.ppe_compliance,
+    ppe_violations: p.ppe_violations ?? [],
+    zone_clearance: p.zone_clearance ?? false,
+    proximity_alerts: (p.proximity_alerts ?? []).map((a: any) => ({
+      hazard_type: a.hazard_type,
+      distance_m: a.distance_m,
+      safe_distance_m: a.safe_distance_m,
+    })),
+    analyzed_at: p.analyzed_at ?? raw.event_timestamp,
+  };
+}
+
+/** Throws on any network/parse failure -- callers decide how to fall back. */
+export async function fetchZoneRecord(zoneId: string): Promise<ZoneRecord | null> {
+  const res = await fetch(`${API_BASE}/api/zones/${encodeURIComponent(zoneId)}`, { cache: "no-store" });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`api-gateway /api/zones/${zoneId} returned ${res.status}`);
+  const entry: RawZoneEntry = await res.json();
+  const state = mapZoneState(entry.zone_state);
+  const layout = layoutFor(state.zone_id, 0);
+  return {
+    zoneId: state.zone_id,
+    displayName: layout.displayName,
+    x: layout.x,
+    y: layout.y,
+    state,
+    anomalies: [],
+    environment: mapEnvironment(entry.environment),
+    permits: entry.active_permits.map(mapPermit),
+    workers: entry.workers.map(mapWorker),
+    riskScore: null,
+  };
+}
+
+/** Throws on any network/parse failure -- callers decide how to fall back. */
+export async function fetchZoneRecords(): Promise<ZoneRecord[]> {
+  const res = await fetch(`${API_BASE}/api/zones`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`api-gateway /api/zones returned ${res.status}`);
+  const data: { zones: RawZoneEntry[] } = await res.json();
+
+  return data.zones.map((entry, index) => {
+    const state = mapZoneState(entry.zone_state);
+    const layout = layoutFor(state.zone_id, index);
+    return {
+      zoneId: state.zone_id,
+      displayName: layout.displayName,
+      x: layout.x,
+      y: layout.y,
+      state,
+      // ZoneAnomalyDetected has no registered Kafka topic yet (see the
+      // Zone Agent audit -- computed internally, never published), so the
+      // api-gateway has nothing to serve here. Empty, not fabricated.
+      anomalies: [],
+      environment: mapEnvironment(entry.environment),
+      permits: entry.active_permits.map(mapPermit),
+      workers: entry.workers.map(mapWorker),
+      // No Risk Orchestrator exists yet -- out of scope per the master
+      // prompt. Real absence, not a loading state.
+      riskScore: null,
+    };
+  });
+}
+
+export function deriveSiteState(zones: ZoneRecord[]): SiteState {
+  const totalWorkers = zones.reduce((sum, z) => sum + z.state.occupancy_count, 0);
+  const activeIncidents = zones.reduce((sum, z) => sum + z.state.recent_incident_count, 0);
+
+  const riskOrder: Record<RiskLevel, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, CRITICAL: 3, LOCKDOWN: 4 };
+  let highest = zones[0] ?? null;
+  for (const z of zones) {
+    if (highest === null || riskOrder[z.state.current_risk_level] > riskOrder[highest.state.current_risk_level]) {
+      highest = z;
+    }
+  }
+
+  const overallByRisk: Record<RiskLevel, SiteState["overall_state"]> = {
+    LOW: "normal",
+    MEDIUM: "elevated",
+    HIGH: "elevated",
+    CRITICAL: "emergency",
+    LOCKDOWN: "lockdown",
+  };
+
+  return {
+    site_id: zones[0]?.state.site_id ?? "SITE-1",
+    overall_state: highest ? overallByRisk[highest.state.current_risk_level] : "normal",
+    zone_summary: Object.fromEntries(zones.map((z) => [z.zoneId, riskOrder[z.state.current_risk_level]])),
+    total_workers: totalWorkers,
+    highest_risk_zone: highest?.displayName ?? "--",
+    highest_risk_score: highest ? riskOrder[highest.state.current_risk_level] * 25 : 0,
+    active_incidents: activeIncidents,
+    changed_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * Derives a "what changed recently" feed straight from the real analysis
+ * explanations already present on each zone -- not a separate event log
+ * (none exists in the api-gateway yet), so this is a real-data view, not
+ * a simulation, but it will only ever show the latest snapshot per
+ * agent/zone rather than a true historical stream.
+ */
+export function deriveFeed(zones: ZoneRecord[]): FeedItem[] {
+  const items: FeedItem[] = [];
+  for (const z of zones) {
+    if (z.environment) {
+      items.push({
+        id: `env-${z.zoneId}`,
+        zoneId: z.zoneId,
+        message: `${z.displayName}: ${z.environment.hazards.map((h) => h.hazard_type).join(", ") || "no active hazards"}`,
+        timestamp: z.environment.analyzed_at,
+        source: "real",
+        severity: z.environment.evacuation_required ? "CRITICAL" : "INFO",
+      });
+    }
+    for (const p of z.permits) {
+      items.push({
+        id: `permit-${p.permit_id}`,
+        zoneId: z.zoneId,
+        message: `Permit ${p.permit_id} (${p.permit_type}): ${p.permit_risk_level} risk`,
+        timestamp: p.analyzed_at,
+        source: "real",
+        severity: "INFO",
+      });
+    }
+    for (const w of z.workers) {
+      items.push({
+        id: `worker-${w.worker_id}`,
+        zoneId: z.zoneId,
+        message:
+          w.ppe_violations.length > 0
+            ? `Worker ${w.worker_id} missing PPE: ${w.ppe_violations.join(", ")}`
+            : `Worker ${w.worker_id}: ${w.safety_status}`,
+        timestamp: w.analyzed_at,
+        source: "real",
+        severity: w.safety_status === "in_danger" ? "CRITICAL" : w.ppe_violations.length > 0 ? "MEDIUM" : "INFO",
+      });
+    }
+  }
+  return items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+}

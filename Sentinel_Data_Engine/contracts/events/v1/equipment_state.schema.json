@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/events/v1/equipment_state",
+  "title": "EquipmentState",
+  "description": "Equipment operational state snapshot. Published on state transitions. Consumed by maintenance agent and zone agent.",
+  "allOf": [{ "$ref": "./base_event.schema.json" }],
+  "properties": {
+    "event_type": { "const": "equipment.state_change" },
+    "payload": {
+      "type": "object",
+      "required": ["equipment_id","state","previous_state","changed_at"],
+      "properties": {
+        "equipment_id":   { "type": "string" },
+        "equipment_type": { "type": "string" },
+        "state":          { "type": "string", "enum": ["operational","degraded","fault","isolated","loto","maintenance","decommissioned","starting","stopping"] },
+        "previous_state": { "type": "string" },
+        "health_index":   { "type": "number", "minimum": 0, "maximum": 1 },
+        "active_faults":  { "type": "array", "items": { "type": "string" } },
+        "loto_reference": { "type": "string" },
+        "isolation_authority": { "type": "string" },
+        "changed_at":     { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

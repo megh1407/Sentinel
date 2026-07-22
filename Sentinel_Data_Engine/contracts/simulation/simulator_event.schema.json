@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/simulation/v1/simulator_event",
+  "title": "SimulatorEvent",
+  "description": "Envelope wrapping a real domain event when injected by the simulator, so consumers can distinguish synthetic test traffic from production traffic and route accordingly.",
+  "allOf": [{ "$ref": "../../events/v1/base_event.schema.json" }],
+  "required": ["simulation_id","scenario_id","is_synthetic"],
+  "properties": {
+    "is_synthetic":   { "const": true },
+    "simulation_id":  { "type": "string", "format": "uuid", "description": "Unique ID for this run of the scenario" },
+    "scenario_id":    { "type": "string", "description": "References simulation/scenario.schema.json scenario_id" },
+    "injected_at":    { "type": "string", "format": "date-time" },
+    "injected_by":    { "type": "string", "description": "user_id or CI pipeline that triggered the simulation" },
+    "wrapped_event":  { "type": "object", "description": "The actual domain event being simulated (sensor_event, worker_event, etc.)" },
+    "environment":    { "type": "string", "enum": ["staging","training","chaos_test"], "description": "Synthetic events must NEVER target 'production'" }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "type": "record",
+  "name": "SensorEvent",
+  "namespace": "com.sentinel.events.sensorevent.v2",
+  "doc": "v2: additive, backward-compatible evolution of SensorEvent v1. Adds payload.calibration_offset and payload.battery_level_percent as OPTIONAL fields with defaults, per the minor-version rule (Part 5). All v1 consumers can read v2 payloads unmodified (extra fields simply absent from their view); this is proven by test_backward_compatibility.py.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "SensorEvent"},
+    {"name": "event_version", "type": "int", "default": 2},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": "string"},
+    {"name": "partition_key", "type": "string"},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "SensorEventPayload",
+      "fields": [
+        {"name": "sensor_id", "type": "string"},
+        {"name": "sensor_type", "type": {"type": "enum", "name": "SensorType",
+          "symbols": ["GAS", "TEMPERATURE", "PRESSURE", "VIBRATION", "PROXIMITY", "SMOKE", "HUMIDITY"]}},
+        {"name": "value", "type": "double"},
+        {"name": "unit", "type": "string"},
+        {"name": "threshold_breached", "type": "boolean"},
+        {"name": "sensor_status", "type": {"type": "enum", "name": "SensorStatus", "symbols": ["ACTIVE", "FAULTY", "DECOMMISSIONED"]}, "default": "ACTIVE"},
+        {"name": "location", "type": ["null", "com.sentinel.common.GeoLocation"], "default": null},
+        {"name": "raw_metadata", "type": {"type": "map", "values": "string"}, "default": {}},
+        {"name": "calibration_offset", "type": ["null", "double"], "default": null, "doc": "NEW in v2: optional sensor calibration offset applied to raw readings."},
+        {"name": "battery_level_percent", "type": ["null", "int"], "default": null, "doc": "NEW in v2: optional battery telemetry for wireless sensors."}
+      ]
+    }}
+  ]
+}

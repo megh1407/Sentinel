@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "ConfidenceScore",
+  "namespace": "com.sentinel.common",
+  "doc": "A structured confidence value with provenance, distinguishing rule-derived from model-derived confidence so downstream consumers never conflate the two.",
+  "fields": [
+    {"name": "value", "type": "double", "doc": "Confidence in [0,1]."},
+    {"name": "derivation", "type": "com.sentinel.common.ConfidenceDerivation"},
+    {"name": "model_name", "type": ["null", "string"], "default": null},
+    {"name": "model_version", "type": ["null", "string"], "default": null},
+    {"name": "rule_id", "type": ["null", "string"], "default": null},
+    {"name": "rule_version", "type": ["null", "int"], "default": null}
+  ]
+}

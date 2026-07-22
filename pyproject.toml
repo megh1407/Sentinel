@@ -1,0 +1,43 @@
+# SENTINEL — root workspace pyproject.toml
+#
+# Populated from the dependency set already declared in requirements.txt
+# and the workspace layout already documented in README.md ("Folder
+# structure (as built)"). Introduces no new build system, package
+# manager, or dependency choices beyond what the repository already uses.
+
+[project]
+name = "sentinel"
+version = "0.1.0"
+description = "SENTINEL Industrial Safety Intelligence Platform — monorepo workspace root."
+requires-python = ">=3.12"
+dependencies = [
+    # contracts layer (already built)
+    "fastavro>=1.9,<2",
+    "pydantic>=2.7,<3",
+    "requests>=2.31,<3",
+
+    # eventbus
+    "confluent-kafka>=2.5,<3",
+
+    # state
+    "redis>=5.0,<6",
+    "sqlalchemy>=2.0,<3",
+    "psycopg2-binary>=2.9,<3",
+    "alembic>=1.13,<2",
+    "neo4j>=5.20,<7",
+    "qdrant-client>=1.9,<2",
+
+    # agent sdk / observability
+    "structlog>=24.1,<27",
+    "opentelemetry-sdk>=1.24,<2",
+    "opentelemetry-exporter-otlp>=1.24,<2",
+    "prometheus-client>=0.20,<1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0,<9"]
+
+[tool.setuptools.packages.find]
+# Matches the workspace layout documented in README.md.
+where = ["libs", "."]
+include = ["sentinel_*", "sentinel_contracts*"]

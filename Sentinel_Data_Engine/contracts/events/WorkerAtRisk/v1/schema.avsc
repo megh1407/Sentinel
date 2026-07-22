@@ -1,0 +1,31 @@
+{
+  "type": "record",
+  "name": "WorkerAtRisk",
+  "namespace": "com.sentinel.events.workeratrisk.v1",
+  "doc": "Published by the Worker Intelligence Agent when a worker meets an at-risk condition. Decision-bearing: explanation REQUIRED.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "WorkerAtRisk"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string", "default": "worker-intelligence-agent"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": ["null", "string"], "default": null},
+    {"name": "partition_key", "type": "string"},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "explanation", "type": "com.sentinel.common.ExplanationObject"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "WorkerAtRiskPayload",
+      "fields": [
+        {"name": "worker_id", "type": "string"},
+        {"name": "risk_type", "type": {"type": "enum", "name": "WorkerRiskType",
+          "symbols": ["FATIGUE", "PPE_VIOLATION", "LONE_WORKER_HAZARD", "EXPOSURE_LIMIT", "LOCATION_HAZARD"]}}
+      ]
+    }}
+  ]
+}

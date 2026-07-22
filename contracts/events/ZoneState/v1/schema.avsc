@@ -1,0 +1,40 @@
+{
+  "type": "record",
+  "name": "ZoneState",
+  "namespace": "com.sentinel.events.zonestate.v1",
+  "doc": "Materialized 'what's true about this zone right now' projection, owned by the Zone Context. Intelligence Event category.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "ZoneState"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": "string"},
+    {"name": "partition_key", "type": "string", "doc": "Always equal to zone_id for this topic."},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "ZoneStatePayload",
+      "fields": [
+        {"name": "current_risk_level", "type": {"type": "enum", "name": "RiskLevel",
+          "symbols": ["LOW", "MEDIUM", "HIGH", "CRITICAL", "LOCKDOWN"]}},
+        {"name": "active_permit_ids", "type": {"type": "array", "items": "string"}, "default": []},
+        {"name": "active_permit_types", "type": {"type": "map", "values": "string"}, "default": {}, "doc": "permit_id -> permit_type, needed to evaluate the conflicting-permits rule."},
+        {"name": "occupancy_count", "type": "int"},
+        {"name": "active_sensor_alert_ids", "type": {"type": "array", "items": "string"}, "default": []},
+        {"name": "active_equipment_risk_ids", "type": {"type": "array", "items": "string"}, "default": []},
+        {"name": "recent_incident_count", "type": "int", "default": 0, "doc": "Count of distinct incidents in this zone within the configured incident anomaly_window (currently hardcoded, see agent known-gaps)."},
+        {"name": "pending_critical_maintenance_asset_ids", "type": {"type": "array", "items": "string"}, "default": [], "doc": "Assets with a HIGH/CRITICAL urgency MaintenanceRequired pending in this zone."},
+        {"name": "last_sensor_reading_ts", "type": {"type": "map", "values": "double"}, "default": {}, "doc": "sensor_id -> unix timestamp of its last reading, used for the missing-sensor-data rule."},
+        {"name": "stale_sensor_ids", "type": {"type": "array", "items": "string"}, "default": [], "doc": "Sensors currently flagged as stale, to avoid re-firing MISSING_SENSOR_DATA on every subsequent event."},
+        {"name": "last_updated", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+        {"name": "is_stale", "type": "boolean", "default": false, "doc": "True when this ZoneState is being served from a cache TTL expiry fallback rather than a fresh recomputation (Phase 1 Runtime Spec, Part 5.1)."}
+      ]
+    }}
+  ]
+}

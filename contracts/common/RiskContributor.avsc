@@ -1,0 +1,12 @@
+{
+  "type": "record",
+  "name": "RiskContributor",
+  "namespace": "com.sentinel.common",
+  "doc": "The concrete application of a named RiskFactor to a specific RiskScore, with its evidence pointer.",
+  "fields": [
+    {"name": "factor_name", "type": "string", "doc": "Stable RiskFactor key, e.g. 'gas_concentration', 'permit_zone_overlap'. Never reused for a different meaning once published."},
+    {"name": "contribution_score", "type": "double", "doc": "This contributor's weighted contribution to the overall RiskScore.score, in [0,100]."},
+    {"name": "description", "type": "string", "doc": "Human-readable statement of why this factor fired, suitable for direct inclusion in a generated explanation sentence."},
+    {"name": "source_event_id", "type": ["null", "string"], "default": null, "doc": "Optional pointer to the specific upstream event whose reading drove this contributor."}
+  ]
+}

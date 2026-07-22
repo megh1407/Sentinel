@@ -1,0 +1,275 @@
+{
+  "type": "record",
+  "name": "PermitAnalysis",
+  "namespace": "com.sentinel.agentcontracts.permitanalysis.v1",
+  "doc": "Avro translation of contracts/agent-contracts/v1/permit_analysis.schema.json per the same inlining pattern used by ZoneAnalysis.avsc / EnvironmentAnalysis.avsc / WorkerAnalysis.avsc / MaintenanceAnalysis.avsc / IncidentAnalysis.avsc. Avro has no inheritance, so the BaseEvent envelope and the AgentResult provenance/decision-metadata fields (formerly reached via allOf -> agent_result.schema.json) are inlined directly here rather than referenced. Field-by-field mapping: see PermitAnalysis_field_mapping.md in this directory.",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "UUIDv7, unique per event instance."
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "PermitAnalysis"
+    },
+    {
+      "name": "event_version",
+      "type": "int",
+      "default": 1
+    },
+    {
+      "name": "event_timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "correlation_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "causation_id",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "producer_service",
+      "type": "string"
+    },
+    {
+      "name": "producer_version",
+      "type": "string"
+    },
+    {
+      "name": "site_id",
+      "type": "string"
+    },
+    {
+      "name": "zone_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "partition_key",
+      "type": "string"
+    },
+    {
+      "name": "trace_id",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "metadata",
+      "type": "com.sentinel.common.Metadata"
+    },
+    {
+      "name": "agent_id",
+      "type": "string"
+    },
+    {
+      "name": "agent_version",
+      "type": "string",
+      "doc": "Semver, e.g. '1.4.2'."
+    },
+    {
+      "name": "input_events",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      }
+    },
+    {
+      "name": "result_type",
+      "type": "string",
+      "default": "permit_analysis"
+    },
+    {
+      "name": "confidence",
+      "type": "double",
+      "doc": "Agent's overall confidence in this result, in [0,1]."
+    },
+    {
+      "name": "processing_time_ms",
+      "type": "int"
+    },
+    {
+      "name": "error",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "PermitAnalysisError",
+          "fields": [
+            {
+              "name": "code",
+              "type": "string"
+            },
+            {
+              "name": "message",
+              "type": "string"
+            },
+            {
+              "name": "retryable",
+              "type": "boolean"
+            }
+          ]
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "explanation",
+      "type": "com.sentinel.common.ExplanationObject",
+      "doc": "REQUIRED -- no finding without a populated explanation, matching every sibling *Analysis.avsc."
+    },
+    {
+      "name": "payload",
+      "type": {
+        "type": "record",
+        "name": "PermitAnalysisPayload",
+        "fields": [
+          {
+            "name": "permit_id",
+            "type": "string",
+            "doc": "CONTRACT CONFLICT RESOLVED (see PermitAnalysis_field_mapping.md): permit_analysis.schema.json declares this field 'format: uuid', but the actual frozen PermitEvent.payload.permit_id (contracts/events/PermitEvent/v1/schema.avsc) it refers to is a plain business-identifier string with no uuid constraint -- e.g. real permit numbers are not UUIDs. Encoded here as plain string, matching the real upstream source of truth rather than the JSON Schema's own inconsistent annotation."
+          },
+          {
+            "name": "permit_risk_level",
+            "type": [
+              "null",
+              {
+                "type": "enum",
+                "name": "PermitRiskLevel",
+                "symbols": [
+                  "acceptable",
+                  "elevated",
+                  "high",
+                  "unacceptable"
+                ]
+              }
+            ],
+            "default": null
+          },
+          {
+            "name": "risk_score",
+            "type": "double",
+            "doc": "Range [0,100]."
+          },
+          {
+            "name": "confidence",
+            "type": "double",
+            "doc": "Range [0,1]."
+          },
+          {
+            "name": "conflicts",
+            "type": {
+              "type": "array",
+              "items": {
+                "type": "record",
+                "name": "PermitConflictDetail",
+                "fields": [
+                  {
+                    "name": "conflicting_permit_id",
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "default": null,
+                    "doc": "Same fix as payload.permit_id above -- plain string, not uuid (see doc there)."
+                  },
+                  {
+                    "name": "conflict_type",
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "default": null
+                  },
+                  {
+                    "name": "severity",
+                    "type": [
+                      "null",
+                      {
+                        "type": "enum",
+                        "name": "PermitConflictSeverity",
+                        "symbols": [
+                          "advisory",
+                          "warning",
+                          "blocking"
+                        ]
+                      }
+                    ],
+                    "default": null
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "zone_compatibility",
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "default": null,
+            "doc": "null = UNKNOWN (e.g. no ZoneState context was available at analysis time) -- never inferred as safe."
+          },
+          {
+            "name": "zone_risk_at_issuance",
+            "type": [
+              "null",
+              "double"
+            ],
+            "default": null,
+            "doc": "Range [0,100] when present."
+          },
+          {
+            "name": "evidence",
+            "type": {
+              "type": "array",
+              "items": "string"
+            }
+          },
+          {
+            "name": "recommendations",
+            "type": {
+              "type": "array",
+              "items": "string"
+            }
+          },
+          {
+            "name": "analyzed_at",
+            "type": {
+              "type": "long",
+              "logicalType": "timestamp-millis"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

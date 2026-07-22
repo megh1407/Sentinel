@@ -1,0 +1,51 @@
+"""The domain exception hierarchy (CSEGS §6.1, FRS §4.6)."""
+
+from risk_orchestrator_agent.domain.exceptions.base import (
+    ContextBuildException,
+    CorrelationException,
+    DomainException,
+    EventContractException,
+    ExceptionContext,
+    ExceptionSeverity,
+    PersistenceException,
+    PredictionException,
+    RecommendationException,
+    RuleEvaluationException,
+    SentinelException,
+    ValidationException,
+)
+from risk_orchestrator_agent.domain.exceptions.domain_exceptions import (
+    CircularRuleDependencyError,
+    ConfigurationValidationError,
+    ContextValidationError,
+    EvidenceChainBrokenError,
+    FatalError,
+    IncompleteExplanationError,
+    InfrastructureError,
+    RetryableError,
+    RuleSetLoadError,
+)
+
+__all__ = [
+    "CircularRuleDependencyError",
+    "ConfigurationValidationError",
+    "ContextBuildException",
+    "ContextValidationError",
+    "CorrelationException",
+    "DomainException",
+    "EventContractException",
+    "EvidenceChainBrokenError",
+    "ExceptionContext",
+    "ExceptionSeverity",
+    "FatalError",
+    "IncompleteExplanationError",
+    "InfrastructureError",
+    "PersistenceException",
+    "PredictionException",
+    "RecommendationException",
+    "RetryableError",
+    "RuleEvaluationException",
+    "RuleSetLoadError",
+    "SentinelException",
+    "ValidationException",
+]

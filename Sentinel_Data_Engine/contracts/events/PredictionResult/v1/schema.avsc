@@ -1,0 +1,35 @@
+{
+  "type": "record",
+  "name": "PredictionResult",
+  "namespace": "com.sentinel.events.predictionresult.v1",
+  "doc": "Forward-looking prediction, owned by the Risk Context (produced by Forecasting Agent). Intelligence Event category. Decision-bearing: explanation is REQUIRED.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "PredictionResult"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": ["null", "string"], "default": null},
+    {"name": "partition_key", "type": "string"},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "explanation", "type": "com.sentinel.common.ExplanationObject"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "PredictionResultPayload",
+      "fields": [
+        {"name": "prediction_id", "type": "string"},
+        {"name": "model_name", "type": "string"},
+        {"name": "model_version", "type": "string"},
+        {"name": "subject_ref", "type": "string", "doc": "zone_id, asset_id, or other entity this prediction is about."},
+        {"name": "predicted_event_type", "type": "string", "doc": "The event_type this prediction anticipates, e.g. 'RiskScore'."},
+        {"name": "predicted_probability", "type": "double", "doc": "In [0,1]."},
+        {"name": "prediction_horizon_seconds", "type": "long"}
+      ]
+    }}
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/events/v1/maintenance_event",
+  "title": "MaintenanceEvent",
+  "description": "Equipment maintenance lifecycle and telemetry events.",
+  "allOf": [{ "$ref": "./base_event.schema.json" }],
+  "properties": {
+    "event_type": { "type": "string", "enum": ["maintenance.scheduled","maintenance.started","maintenance.completed","maintenance.overdue","equipment.telemetry","equipment.fault","equipment.isolated","equipment.restored"] },
+    "payload": {
+      "type": "object",
+      "required": ["equipment_id","event_subtype"],
+      "properties": {
+        "equipment_id":     { "type": "string" },
+        "equipment_type":   { "type": "string" },
+        "event_subtype":    { "type": "string" },
+        "maintenance_type": { "type": "string", "enum": ["preventive","corrective","predictive","emergency","statutory"] },
+        "telemetry": {
+          "type": "object",
+          "properties": {
+            "vibration_hz":   {"type":"number"}, "temperature_c": {"type":"number"},
+            "pressure_bar":   {"type":"number"}, "rpm":           {"type":"number"},
+            "hours_run":      {"type":"number"}, "error_codes":   {"type":"array","items":{"type":"string"}},
+            "oil_pressure":   {"type":"number"}, "bearing_temp":  {"type":"number"}
+          }
+        },
+        "last_serviced_at": { "type": "string", "format": "date-time" },
+        "next_service_due": { "type": "string", "format": "date-time" },
+        "criticality":      { "type": "string", "enum": ["low","medium","high","critical"] },
+        "loto_applied":     { "type": "boolean", "description": "Lockout/tagout applied" }
+      }
+    }
+  }
+}

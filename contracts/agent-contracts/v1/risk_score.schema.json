@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sentinel.io/schemas/agent-contracts/v1/risk_score",
+  "title": "RiskScore",
+  "description": "Canonical risk score from the Risk Orchestrator. Consumed by Dashboard, Response Agent, Safety Copilot.",
+  "allOf": [{ "$ref": "../../events/v1/base_event.schema.json" }],
+  "required": ["risk_id","zone_id","score","severity","contributors","explanation_summary","computed_at"],
+  "properties": {
+    "event_type": { "const": "risk.score.computed" },
+    "risk_id":    { "type": "string", "format": "uuid" },
+    "zone_id":    { "type": "string" },
+    "score":      { "type": "number", "minimum": 0, "maximum": 100 },
+    "severity":   { "type": "string", "enum": ["negligible","low","moderate","high","critical","catastrophic"] },
+    "contributors": { "type": "array", "items": { "type": "object", "required": ["agent","factor","weight"], "properties": {
+      "agent": {"type":"string"}, "factor": {"type":"string"}, "weight": {"type":"number","minimum":0,"maximum":1},
+      "score": {"type":"number","minimum":0,"maximum":100}, "evidence": {"type":"array","items":{"type":"string"}}
+    } } },
+    "explanation_summary": { "type": "string" },
+    "input_analysis_ids":  { "type": "array", "items": { "type": "string", "format": "uuid" } },
+    "computed_at": { "type": "string", "format": "date-time" },
+    "ttl_seconds": { "type": "integer", "default": 30 }
+  }
+}

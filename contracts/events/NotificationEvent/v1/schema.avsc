@@ -1,0 +1,34 @@
+{
+  "type": "record",
+  "name": "NotificationEvent",
+  "namespace": "com.sentinel.events.notificationevent.v1",
+  "doc": "Published by the Notification Agent to record a delivery attempt across a communication channel. Not decision-bearing (a delivery record, not a finding).",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "NotificationEvent"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string", "default": "notification-agent"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": ["null", "string"], "default": null},
+    {"name": "partition_key", "type": "string", "doc": "notification_id."},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "NotificationEventPayload",
+      "fields": [
+        {"name": "notification_id", "type": "string"},
+        {"name": "channel", "type": {"type": "enum", "name": "NotificationChannel", "symbols": ["EMAIL", "SMS", "PUSH", "DASHBOARD"]}},
+        {"name": "recipient_ref", "type": "string"},
+        {"name": "related_action_id", "type": ["null", "string"], "default": null},
+        {"name": "related_alert_id", "type": ["null", "string"], "default": null},
+        {"name": "delivery_status", "type": {"type": "enum", "name": "DeliveryStatus", "symbols": ["PENDING", "SENT", "FAILED", "ACKNOWLEDGED"]}},
+        {"name": "retry_attempt", "type": "int", "default": 0}
+      ]
+    }}
+  ]
+}

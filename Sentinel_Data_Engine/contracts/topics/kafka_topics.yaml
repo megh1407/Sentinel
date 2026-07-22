@@ -1,0 +1,302 @@
+# ============================================================
+# SENTINEL Kafka Topic Contracts
+# Every topic uses zone_id as partition key unless noted.
+# Schema Registry enforces contracts on produce (compatibility: BACKWARD).
+# ============================================================
+
+sentinel.sensor.events.v1:
+  description: "Raw IoT/SCADA sensor readings"
+  schema: sensor_event
+  producer: ingestion-service
+  consumers:
+    - zone_intelligence_agent
+    - environmental_intelligence_agent
+    - maintenance_intelligence_agent
+  partition_key: zone_id
+  partitions: 100
+  replication_factor: 3
+  retention_ms: 604800000      # 7 days
+  cleanup_policy: delete
+  compression_type: lz4
+  max_message_bytes: 1048576
+  retry_policy:
+    max_retries: 3
+    backoff_ms: 200
+
+sentinel.permit.events.v1:
+  description: "Permit lifecycle transitions"
+  schema: permit_event
+  producer: permit-management-system
+  consumers:
+    - permit_intelligence_agent
+  partition_key: zone_id
+  partitions: 20
+  replication_factor: 3
+  retention_ms: 2592000000     # 30 days
+  cleanup_policy: delete
+  retry_policy:
+    max_retries: 5
+    backoff_ms: 500
+
+sentinel.worker.events.v1:
+  description: "Worker location, PPE, biometric telemetry"
+  schema: worker_event
+  producer: rtls-gateway, ppe-vision-service
+  consumers:
+    - worker_safety_agent
+    - zone_intelligence_agent
+  partition_key: zone_id
+  partitions: 100
+  replication_factor: 3
+  retention_ms: 86400000       # 1 day
+  cleanup_policy: delete
+  retry_policy:
+    max_retries: 3
+    backoff_ms: 100
+
+sentinel.maintenance.events.v1:
+  description: "Equipment maintenance lifecycle and telemetry"
+  schema: maintenance_event
+  producer: cmms-connector, equipment-telemetry-gateway
+  consumers:
+    - maintenance_intelligence_agent
+  partition_key: zone_id
+  partitions: 20
+  replication_factor: 3
+  retention_ms: 172800000      # 2 days
+  cleanup_policy: delete
+  retry_policy:
+    max_retries: 3
+    backoff_ms: 200
+
+sentinel.environmental.events.v1:
+  description: "Aggregated environmental condition changes"
+  schema: environmental_event
+  producer: environmental-monitoring-service
+  consumers:
+    - environmental_intelligence_agent
+  partition_key: zone_id
+  partitions: 50
+  replication_factor: 3
+  retention_ms: 86400000
+  cleanup_policy: delete
+
+sentinel.incident.events.v1:
+  description: "Historical and live incident reports"
+  schema: incident_event
+  producer: incident-management-system
+  consumers:
+    - incident_intelligence_agent
+  partition_key: site_id
+  partitions: 10
+  replication_factor: 3
+  retention_ms: -1             # infinite — historical record
+  cleanup_policy: compact
+
+sentinel.zone.state.v1:
+  description: "Zone operational state transitions"
+  schema: zone_state
+  producer: zone_intelligence_agent
+  consumers:
+    - permit_intelligence_agent
+    - worker_safety_agent
+    - dashboard-service
+  partition_key: zone_id
+  partitions: 50
+  replication_factor: 3
+  retention_ms: 86400000
+  cleanup_policy: compact
+
+sentinel.equipment.state.v1:
+  description: "Equipment operational state transitions"
+  schema: equipment_state
+  producer: maintenance_intelligence_agent
+  consumers:
+    - zone_intelligence_agent
+    - dashboard-service
+  partition_key: equipment_id
+  partitions: 30
+  replication_factor: 3
+  retention_ms: 86400000
+  cleanup_policy: compact
+
+sentinel.site.state.v1:
+  description: "Factory-wide aggregated state"
+  schema: site_state
+  producer: risk_orchestrator_agent
+  consumers:
+    - dashboard-service
+    - executive-reporting-service
+  partition_key: site_id
+  partitions: 5
+  replication_factor: 3
+  retention_ms: 86400000
+  cleanup_policy: compact
+
+sentinel.zone.analysis.v1:
+  description: "Zone Intelligence Agent output"
+  schema: zone_analysis
+  producer: zone_intelligence_agent
+  consumers:
+    - risk_orchestrator_agent
+    - permit_intelligence_agent
+    - worker_safety_agent
+    - safety_copilot_agent
+  partition_key: zone_id
+  partitions: 50
+  replication_factor: 3
+  retention_ms: 86400000
+  max_message_bytes: 1048576
+  retry_policy:
+    max_retries: 3
+    backoff_ms: 200
+
+sentinel.permit.analysis.v1:
+  description: "Permit Intelligence Agent output"
+  schema: permit_analysis
+  producer: permit_intelligence_agent
+  consumers:
+    - risk_orchestrator_agent
+  partition_key: zone_id
+  partitions: 20
+  replication_factor: 3
+  retention_ms: 86400000
+
+sentinel.worker.analysis.v1:
+  description: "Worker Safety Agent output"
+  schema: worker_analysis
+  producer: worker_safety_agent
+  consumers:
+    - risk_orchestrator_agent
+    - zone_intelligence_agent
+  partition_key: zone_id
+  partitions: 50
+  replication_factor: 3
+  retention_ms: 86400000
+
+sentinel.maintenance.analysis.v1:
+  description: "Maintenance Intelligence Agent output"
+  schema: maintenance_analysis
+  producer: maintenance_intelligence_agent
+  consumers:
+    - risk_orchestrator_agent
+  partition_key: zone_id
+  partitions: 20
+  replication_factor: 3
+  retention_ms: 172800000
+
+sentinel.environment.analysis.v1:
+  description: "Environmental Intelligence Agent output"
+  schema: environment_analysis
+  producer: environmental_intelligence_agent
+  consumers:
+    - risk_orchestrator_agent
+  partition_key: zone_id
+  partitions: 50
+  replication_factor: 3
+  retention_ms: 86400000
+
+sentinel.incident.analysis.v1:
+  description: "Incident Intelligence Agent output (RAG results)"
+  schema: incident_analysis
+  producer: incident_intelligence_agent
+  consumers:
+    - risk_orchestrator_agent
+    - safety_copilot_agent
+  partition_key: zone_id
+  partitions: 20
+  replication_factor: 3
+  retention_ms: 259200000      # 3 days
+
+sentinel.prediction.v1:
+  description: "Forward-looking forecasts from any agent"
+  schema: prediction_result
+  producer: maintenance_intelligence_agent, environmental_intelligence_agent, risk_orchestrator_agent
+  consumers:
+    - dashboard-service
+    - safety_copilot_agent
+  partition_key: zone_id
+  partitions: 30
+  replication_factor: 3
+  retention_ms: 86400000
+
+sentinel.risk.score.v1:
+  description: "Canonical risk score from Risk Orchestrator — tier-0 topic"
+  schema: risk_score
+  producer: risk_orchestrator_agent
+  consumers:
+    - response_agent
+    - safety_copilot_agent
+    - incident_intelligence_agent
+    - dashboard-service
+  partition_key: zone_id
+  partitions: 100
+  replication_factor: 3
+  min_insync_replicas: 2
+  retention_ms: 86400000
+  acks: all
+  retry_policy:
+    max_retries: 5
+    backoff_ms: 100
+
+sentinel.action.request.v1:
+  description: "Proposed actions from Response Agent — tier-0 topic"
+  schema: action_request
+  producer: response_agent
+  consumers:
+    - action_gateway
+  partition_key: zone_id
+  partitions: 20
+  replication_factor: 3
+  acks: all
+  idempotent: true
+  retention_ms: 604800000      # 7 days
+
+sentinel.action.request.v2:
+  description: "Proposed actions from Response Agent — tier-0 topic. v2: justification field renamed to explanation (Artifact 6 §2/§14; Artifact 12 Phase 3 Step 10). Registered per compatibility_rules.md's migration procedure step 1-2; dual-write to v1+v2 begins once a real producer exists (none does today -- response_agent has no implemented code)."
+  schema: action_request
+  producer: response_agent
+  consumers:
+    - action_gateway
+  partition_key: zone_id
+  partitions: 20
+  replication_factor: 3
+  acks: all
+  idempotent: true
+  retention_ms: 604800000      # 7 days
+
+sentinel.action.result.v1:
+  description: "Execution outcomes from Action Gateway — immutable audit record"
+  schema: action_result
+  producer: action_gateway
+  consumers:
+    - dashboard-service
+    - response_agent
+    - audit-service
+  partition_key: action_id
+  partitions: 20
+  replication_factor: 3
+  retention_ms: 7776000000     # 90 days
+  cleanup_policy: delete
+
+sentinel.explanation.v1:
+  description: "Safety Copilot explanations"
+  schema: explanation
+  producer: safety_copilot_agent
+  consumers:
+    - dashboard-service
+    - operator-terminal-service
+  partition_key: zone_id
+  partitions: 20
+  replication_factor: 3
+  retention_ms: 86400000
+
+# ============================================================
+# Dead Letter Queue convention
+# Pattern: sentinel.dlq.{original-topic-name}
+# Created automatically for every topic above on first failure.
+# ============================================================
+dlq_convention:
+  pattern: "sentinel.dlq.{topic}"
+  retention_ms: 1209600000     # 14 days
+  alert_threshold_pct: 0.1

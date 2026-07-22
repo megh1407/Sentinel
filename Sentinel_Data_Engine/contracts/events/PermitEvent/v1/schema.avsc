@@ -1,0 +1,43 @@
+{
+  "type": "record",
+  "name": "PermitEvent",
+  "namespace": "com.sentinel.events.permitevent.v1",
+  "doc": "Permit-to-Work lifecycle transition, owned by the Permit Context. Ingestion Event category.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "PermitEvent"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": "string"},
+    {"name": "partition_key", "type": "string", "doc": "Always equal to zone_id for this topic."},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "PermitEventPayload",
+      "fields": [
+        {"name": "permit_id", "type": "string"},
+        {"name": "permit_type", "type": {"type": "enum", "name": "PermitType",
+          "symbols": ["HOT_WORK", "CONFINED_SPACE", "ELECTRICAL", "HEIGHT", "EXCAVATION", "LIFTING"]}},
+        {"name": "status", "type": {"type": "enum", "name": "PermitStatus",
+          "symbols": ["REQUESTED", "APPROVED", "ACTIVE", "SUSPENDED", "CLOSED", "EXPIRED"]}},
+        {"name": "issued_to_worker_id", "type": "string", "doc": "Pseudonymous worker reference. Never a raw PII field."},
+        {"name": "valid_from", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+        {"name": "valid_until", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+        {"name": "conditions", "type": {"type": "array", "items": {
+          "type": "record", "name": "PermitConditionRef",
+          "fields": [
+            {"name": "condition_id", "type": "string"},
+            {"name": "description", "type": "string"},
+            {"name": "is_satisfied", "type": "boolean"}
+          ]
+        }}, "default": []}
+      ]
+    }}
+  ]
+}

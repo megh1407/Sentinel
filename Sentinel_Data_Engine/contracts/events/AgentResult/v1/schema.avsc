@@ -1,0 +1,34 @@
+{
+  "type": "record",
+  "name": "AgentResult",
+  "namespace": "com.sentinel.events.agentresult.v1",
+  "doc": "A finding published by any Intelligence Agent, consumed exclusively by the Risk Orchestrator. Agent Communication Event category. explanation REQUIRED, including for NO_FINDING (proves liveness).",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "AgentResult"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": ["null", "string"], "default": null},
+    {"name": "partition_key", "type": "string", "doc": "subject_ref."},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "explanation", "type": "com.sentinel.common.ExplanationObject"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "AgentResultPayload",
+      "fields": [
+        {"name": "agent_result_id", "type": "string"},
+        {"name": "agent_name", "type": "string"},
+        {"name": "agent_version", "type": "string"},
+        {"name": "subject_ref", "type": "string"},
+        {"name": "finding", "type": "string", "doc": "e.g. 'gas_concentration_breach', 'permit_zone_overlap', or 'NO_FINDING'."},
+        {"name": "confidence", "type": "double", "doc": "In [0,1]. Mirrors explanation.confidence.value for fast filtering without deserializing the full explanation."}
+      ]
+    }}
+  ]
+}

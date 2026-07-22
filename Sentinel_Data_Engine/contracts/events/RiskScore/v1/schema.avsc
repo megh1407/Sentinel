@@ -1,0 +1,36 @@
+{
+  "type": "record",
+  "name": "RiskScore",
+  "namespace": "com.sentinel.events.riskscore.v1",
+  "doc": "The core explainable output of the Risk Engine, owned by the Risk Context. Intelligence Event category. Decision-bearing: explanation is REQUIRED, never null.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "RiskScore"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": ["null", "string"], "default": null, "doc": "Null only for an explicit site-wide aggregate score."},
+    {"name": "partition_key", "type": "string", "doc": "zone_id if present, else site_id."},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "explanation", "type": "com.sentinel.common.ExplanationObject", "doc": "REQUIRED -- a RiskScore may never be published without a populated explanation (Domain Invariant #4)."},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "RiskScorePayload",
+      "fields": [
+        {"name": "risk_id", "type": "string"},
+        {"name": "score", "type": "double", "doc": "In [0,100]."},
+        {"name": "risk_level", "type": {"type": "enum", "name": "RiskScoreLevel",
+          "symbols": ["LOW", "MEDIUM", "HIGH", "CRITICAL", "LOCKDOWN"]}},
+        {"name": "contributing_agent_result_ids", "type": {"type": "array", "items": "string"}, "default": []},
+        {"name": "compound_rules_fired", "type": {"type": "array", "items": "string"}, "default": [],
+          "doc": "rule_id values of any CompoundRule that fired and potentially overrode the band floor."},
+        {"name": "valid_until", "type": {"type": "long", "logicalType": "timestamp-millis"}}
+      ]
+    }}
+  ]
+}

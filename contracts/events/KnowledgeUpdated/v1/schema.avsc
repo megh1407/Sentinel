@@ -1,0 +1,32 @@
+{
+  "type": "record",
+  "name": "KnowledgeUpdated",
+  "namespace": "com.sentinel.events.knowledgeupdated.v1",
+  "doc": "Published by the Knowledge Context Agent whenever it materializes a graph projection change. Not decision-bearing.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "KnowledgeUpdated"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string", "default": "knowledge-context-agent"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": ["null", "string"], "default": null},
+    {"name": "partition_key", "type": "string"},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "KnowledgeUpdatedPayload",
+      "fields": [
+        {"name": "node_type", "type": {"type": "enum", "name": "KnowledgeNodeType",
+          "symbols": ["ZONE", "ASSET", "PERMIT", "WORKER", "INCIDENT", "SITE"]}},
+        {"name": "node_id", "type": "string"},
+        {"name": "operation", "type": {"type": "enum", "name": "KnowledgeOperation", "symbols": ["CREATED", "UPDATED", "DELETED"]}},
+        {"name": "source_event_id", "type": "string"}
+      ]
+    }}
+  ]
+}

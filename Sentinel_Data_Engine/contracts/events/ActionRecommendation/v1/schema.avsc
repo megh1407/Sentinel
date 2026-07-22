@@ -1,0 +1,33 @@
+{
+  "type": "record",
+  "name": "ActionRecommendation",
+  "namespace": "com.sentinel.events.actionrecommendation.v1",
+  "doc": "Published by the Action Recommendation Agent as an advisory suggestion, consumed by a human operator or by Response/Action Policy Gateway as input (never auto-executed from this event alone -- only an ActionRequest can trigger the approval workflow). Decision-bearing: explanation REQUIRED.",
+  "fields": [
+    {"name": "event_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "event_type", "type": "string", "default": "ActionRecommendation"},
+    {"name": "event_version", "type": "int", "default": 1},
+    {"name": "event_timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlation_id", "type": {"type": "string", "logicalType": "uuid"}},
+    {"name": "causation_id", "type": ["null", {"type": "string", "logicalType": "uuid"}], "default": null},
+    {"name": "producer_service", "type": "string", "default": "action-recommendation-agent"},
+    {"name": "producer_version", "type": "string"},
+    {"name": "site_id", "type": "string"},
+    {"name": "zone_id", "type": ["null", "string"], "default": null},
+    {"name": "partition_key", "type": "string"},
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "metadata", "type": "com.sentinel.common.Metadata"},
+    {"name": "explanation", "type": "com.sentinel.common.ExplanationObject"},
+    {"name": "payload", "type": {
+      "type": "record",
+      "name": "ActionRecommendationPayload",
+      "fields": [
+        {"name": "recommendation_id", "type": "string"},
+        {"name": "risk_id", "type": "string", "doc": "The RiskScore this recommendation responds to."},
+        {"name": "recommended_action_type", "type": {"type": "enum", "name": "RecommendedActionType",
+          "symbols": ["ALERT_OPERATOR", "SUSPEND_PERMIT", "EVACUATE_ZONE", "NOTIFY_MAINTENANCE", "LOCKOUT_REQUEST", "STOP_WORK"]}},
+        {"name": "priority", "type": {"type": "enum", "name": "RecommendationPriority", "symbols": ["LOW", "MEDIUM", "HIGH", "IMMEDIATE"]}}
+      ]
+    }}
+  ]
+}

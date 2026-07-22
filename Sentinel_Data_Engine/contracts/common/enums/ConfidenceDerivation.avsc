@@ -1,0 +1,7 @@
+{
+  "type": "enum",
+  "name": "ConfidenceDerivation",
+  "namespace": "com.sentinel.common",
+  "doc": "Distinguishes rule-derived from model-derived (or composite) confidence so downstream consumers never conflate the two. Extracted from ConfidenceScore.avsc per Artifact 5 §4 so it is independently named and versioned rather than an uncontrolled dependency nested inside another record.",
+  "symbols": ["RULE_BASED", "MODEL_BASED", "COMPOSITE"]
+}
