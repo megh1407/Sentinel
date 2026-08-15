@@ -9,6 +9,8 @@ import ContributingSignals from "@/components/ContributingSignals";
 import CompoundRiskChain from "@/components/CompoundRiskChain";
 import RelationshipGraph from "@/components/RelationshipGraph";
 import SourceTag from "@/components/SourceTag";
+import SafetyExplanationCard from "@/components/SafetyExplanationCard";
+import SafetyCopilot from "@/components/SafetyCopilot";
 
 /**
  * Phase 10 wiring, same honest pattern as app/page.tsx: try the real
@@ -72,6 +74,8 @@ export default async function ZoneDetailPage({ params }: { params: Promise<{ zon
         <SituationSummary zone={zone} />
       </div>
 
+      <SafetyExplanationCard zoneId={zone.zoneId} />
+
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>
           {top ? "Why this zone is risky" : "Zone conditions"}
@@ -94,6 +98,10 @@ export default async function ZoneDetailPage({ params }: { params: Promise<{ zon
       )}
 
       <RelationshipGraph zone={zone} />
+
+      <div style={{ marginTop: 24 }}>
+        <SafetyCopilot zoneId={zone.zoneId} />
+      </div>
     </div>
   );
 }

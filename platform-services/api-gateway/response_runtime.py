@@ -56,11 +56,14 @@ _SEVERITY_PLAN = {
 class ResponseAgent:
     """Stateless w.r.t. risk; keeps only the response cache + idempotency."""
 
-    def __init__(self, redis_client=None) -> None:
+    def __init__(self, redis_client=None, on_persist=None) -> None:
         self._redis = redis_client
         self._lock = threading.RLock()
         self._by_assessment: dict[str, dict] = {}
         self._latest_by_zone: dict[str, dict] = {}
+        # Optional sink for durable persistence (Postgres) -- same isolation
+        # principle as the orchestrator side: never break response handling.
+        self._on_persist = on_persist
 
     # -- Emergency Evaluator ------------------------------------------------
     @staticmethod
@@ -101,6 +104,14 @@ class ResponseAgent:
             decision = self._plan(assessment, action_id)
             self._by_assessment[assessment.assessment_id] = decision
             self._latest_by_zone[assessment.zone_id] = decision
+            if self._on_persist is not None:
+                try:
+                    self._on_persist(assessment, decision)
+                except Exception:  # noqa: BLE001 -- a persistence failure must not break response handling
+                    import logging
+                    logging.getLogger(__name__).exception(
+                        "action_request_persist_failed", extra={"assessment_id": assessment.assessment_id}
+                    )
             return decision
 
     # -- Response Classifier + Action Planner -------------------------------

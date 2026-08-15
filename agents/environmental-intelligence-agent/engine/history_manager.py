@@ -208,6 +208,14 @@ class HistoryManager:
                 "retention_days": retention_days
             }
         )
+
+    def clear(self) -> None:
+        """Demo/test-only: wipes all per-zone history. Without this, history
+        from a previous scenario run (readings, trends) silently persists
+        into the next one, since this class has no other removal path
+        besides its own age/size-based retention."""
+        with self._lock:
+            self._zones.clear()
     
     def _get_or_create_zone(self, zone: str) -> ZoneHistory:
         """

@@ -77,6 +77,13 @@ class SensorSnapshotAggregator:
     def __init__(self) -> None:
         self._buffers: dict[tuple[str, str], PartialSnapshot] = {}
 
+    def clear_all(self) -> None:
+        """Demo/test-only: wipes every zone's accumulated reading buffer at
+        once. Distinct from clear(site_id, zone_id) above (per-zone, used
+        mid-pipeline) -- without this, buffers from a previous scenario
+        silently bleed into the next one across ALL zones."""
+        self._buffers.clear()
+
     def ingest(self, event: SensorEventV1) -> PartialSnapshot:
         """Folds one SensorEvent into its zone's running snapshot and
         returns the (still-partial, until B3) snapshot for that zone."""

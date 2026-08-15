@@ -80,10 +80,80 @@ async def lifespan(app: FastAPI):
     # subscribes, so none dies with UNKNOWN_TOPIC_OR_PART. No-op on memory.
     transport_factory.ensure_topics()
 
-    _state["response"] = ResponseAgent(redis_client=_state["redis"])
+    # Postgres: durable audit trail for the dashboard's History page.
+    # Optional -- if unreachable, everything else still works, the History
+    # page just has nothing to show (same degrade-don't-crash pattern as
+    # Neo4j above). Redis/CachingEventPublisher remain the fast live-read
+    # path with no retention guarantee; this is what survives a reset.
+    _state["history"] = None
+    try:
+        from sentinel_state.postgres_repositories import build_engine, build_session_factory, HistoryRepository
+
+        pg_dsn = os.environ.get(
+            "POSTGRES_DSN", "postgresql://postgres:localdev@localhost:5432/sentinel"
+        )
+        engine = build_engine(pg_dsn)
+        session_factory = build_session_factory(engine)
+        history_repo = HistoryRepository(session_factory)
+        history_repo.ensure_schema()
+        _state["history"] = history_repo
+    except Exception:  # noqa: BLE001 -- history is optional; API still serves everything else
+        import logging
+        logging.getLogger(__name__).warning("postgres_unavailable_for_history", exc_info=True)
+
+    def _persist_assessment(assessment) -> None:
+        import logging
+        log = logging.getLogger(__name__)
+
+        if _state["history"] is not None:
+            try:
+                _state["history"].record_risk_assessment(
+                    assessment_id=assessment.assessment_id,
+                    zone_id=assessment.zone_id,
+                    site_id=getattr(assessment, "site_id", None),
+                    global_score=float(assessment.global_score.value),
+                    severity=assessment.severity.value,
+                    decision_category=assessment.decision_category.value,
+                    escalation_required=bool(getattr(assessment, "escalation_required", False)),
+                    manual_review_required=bool(getattr(assessment, "manual_review_required", False)),
+                    explanation=getattr(assessment, "explanation_summary", None) or str(assessment.severity.value),
+                )
+                log.info("risk_assessment_persisted", extra={"assessment_id": assessment.assessment_id})
+            except Exception:  # noqa: BLE001 -- isolated: must never block the Neo4j update below
+                log.warning("risk_assessment_persist_failed", exc_info=True,
+                            extra={"assessment_id": assessment.assessment_id})
+
+        if _state["neo4j"] is not None:
+            try:
+                from neo4j_topology import set_zone_status_sync
+
+                set_zone_status_sync(_state["neo4j"], assessment.zone_id, assessment.severity.value)
+                log.info("zone_status_updated", extra={"zone_id": assessment.zone_id, "status": assessment.severity.value})
+            except Exception:  # noqa: BLE001 -- isolated: topology-status write must never break risk publishing
+                log.warning("zone_status_update_failed", exc_info=True, extra={"zone_id": assessment.zone_id})
+        else:
+            log.info("zone_status_update_skipped_no_neo4j", extra={"zone_id": assessment.zone_id})
+
+    def _persist_action(assessment, decision: dict) -> None:
+        if _state["history"] is None:
+            return
+        payload = decision.get("action_request", {}).get("payload", {})
+        _state["history"].record_action_request(
+            action_id=payload.get("action_id", decision.get("action_id", "unknown")),
+            assessment_id=assessment.assessment_id,
+            zone_id=assessment.zone_id,
+            action_type=decision.get("action_type", "unknown"),
+            urgency=decision.get("urgency", "unknown"),
+            classification=decision.get("classification", "unknown"),
+            explanation=decision.get("explanation"),
+        )
+
+    _state["response"] = ResponseAgent(redis_client=_state["redis"], on_persist=_persist_action)
     _state["agents"] = start_all_agents(schema_provider)
     _state["cache"] = start_state_cache(schema_provider)
-    _state["orchestrator"] = start_orchestrator(schema_provider, response_agent=_state["response"])
+    _state["orchestrator"] = start_orchestrator(
+        schema_provider, response_agent=_state["response"], on_persist=_persist_assessment
+    )
     # Demo-generator producer, wired to the SAME InMemoryTransport process
     # the agents above are consuming from. Kept separate from run_demo.py's
     # own __main__ block, which -- run as a standalone `python run_demo.py`
@@ -259,6 +329,14 @@ def reset_demo():
     resp = _state.get("response")
     if resp is not None:
         resp.reset()
+    # Environmental Agent keeps its own in-process sensor-buffer and history
+    # state (SensorSnapshotAggregator, HistoryManager) -- neither is Redis-
+    # backed, so nothing above touches it. Without this, a previous
+    # scenario's readings silently bleed into the next run's assessment.
+    for handle in _state.get("agents", []):
+        if handle.name == "environmental-intelligence-agent" and handle.agent is not None:
+            if hasattr(handle.agent, "reset_demo_state"):
+                handle.agent.reset_demo_state()
     # Reset topology node statuses back to normal.
     driver = _state.get("neo4j")
     if driver is not None:
@@ -329,6 +407,67 @@ def list_action_requests():
     return {"responses": _state["response"].all_latest()}
 
 
+@app.get("/api/history")
+def list_history(limit: int = 50):
+    """Real, durably persisted risk-assessment + action-request history from
+    Postgres -- survives demo resets and process restarts, unlike Redis's
+    live-state cache. Empty (not an error) if Postgres was unreachable at
+    startup; the dashboard should show that as 'no history yet', not fake data."""
+    if _state["history"] is None:
+        return {"history": [], "available": False}
+    return {"history": _state["history"].get_history(limit=limit), "available": True}
+
+
+def _explanation_for_zone(zone_id: str):
+    """Shared helper: builds a SafetyExplanation from the same live
+    assessment + action objects the rest of the API already serves.
+    Raises HTTPException(404) if no assessment exists yet for this zone --
+    callers should let that propagate, not fabricate a placeholder."""
+    from safety_explanation import build_explanation
+
+    a = _state["orchestrator"].publisher.latest_for_zone(zone_id)
+    if a is None:
+        raise HTTPException(status_code=404, detail=f"no risk assessment yet for zone_id={zone_id!r}")
+    assessment = _serialize_assessment(a)
+    action = _state["response"].latest_for_zone(zone_id)
+    return build_explanation(assessment, action)
+
+
+@app.get("/api/explanation/{zone_id}")
+def get_explanation(zone_id: str):
+    """Deterministic Safety Explanation -- always available, no LLM
+    required. This is the fallback the dashboard shows immediately, with
+    the LLM-enhanced version (if configured) layered on top asynchronously
+    via /api/copilot/ask -- never the other way around (Phase 13/14)."""
+    return _explanation_for_zone(zone_id).to_dict()
+
+
+@app.post("/api/copilot/ask")
+async def copilot_ask(payload: dict):
+    """LLM Safety Copilot, constrained to verified assessment data only.
+    zone_id and question are required. Always returns a usable answer --
+    'source' in the response tells the frontend whether it came from the
+    LLM or the deterministic fallback, so it can be labeled honestly."""
+    import safety_copilot
+
+    zone_id = payload.get("zone_id")
+    question = payload.get("question", "").strip()
+    if not zone_id or not question:
+        raise HTTPException(status_code=400, detail="zone_id and question are required")
+
+    explanation = _explanation_for_zone(zone_id)
+    return safety_copilot.ask(explanation, question)
+
+
+@app.get("/api/copilot/brief/{zone_id}")
+async def copilot_brief(zone_id: str):
+    """LLM-enhanced conversational summary (falls back to deterministic)."""
+    import safety_copilot
+
+    explanation = _explanation_for_zone(zone_id)
+    return safety_copilot.explain_conversationally(explanation)
+
+
 @app.get("/api/action-requests/{zone_id}")
 def get_action_request(zone_id: str):
     r = _state["response"].latest_for_zone(zone_id)
@@ -351,9 +490,51 @@ def get_topology():
 
 @app.get("/api/health")
 def health():
+    import transport_factory
+
+    redis_ok = False
+    try:
+        redis_ok = bool(_redis().ping())
+    except Exception:  # noqa: BLE001
+        redis_ok = False
+
+    postgres_ok = _state.get("history") is not None
+
+    neo4j_ok = False
+    if _state.get("neo4j") is not None:
+        try:
+            _state["neo4j"].verify_connectivity()
+            neo4j_ok = True
+        except Exception:  # noqa: BLE001
+            neo4j_ok = False
+
+    transport_mode = transport_factory.transport_kind()
+    kafka_ok = None  # unknown/not applicable in memory mode
+    if transport_mode == "kafka":
+        try:
+            from confluent_kafka.admin import AdminClient
+
+            admin = AdminClient({"bootstrap.servers": os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")})
+            admin.list_topics(timeout=3.0)
+            kafka_ok = True
+        except Exception:  # noqa: BLE001
+            kafka_ok = False
+
+    agents = [h.name for h in _state.get("agents", [])]
+
     return {
         "status": "ok",
-        "agents": [h.name for h in _state.get("agents", [])],
+        "transport_mode": transport_mode,
+        "components": {
+            "redis": redis_ok,
+            "postgres": postgres_ok,
+            "neo4j": neo4j_ok,
+            "kafka": kafka_ok,  # null when transport_mode != "kafka" -- N/A, not "down"
+        },
+        "agents": agents,
+        "agents_active": len(agents),
+        "orchestrator_active": _state.get("orchestrator") is not None,
+        "response_agent_active": _state.get("response") is not None,
         "zones_known": len(_all_zone_ids()),
     }
 

@@ -26,9 +26,9 @@ export default function GasTable({ data }: { data: EnvironmentAnalysis | null })
         never fabricated.
       */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 20, paddingBottom: 4 }}>
-        {data.hazards.map((h) => (
+        {data.hazards.map((h, idx) => (
           <GasLevelMeter
-            key={h.label}
+            key={`${h.label}-${idx}`}
             label={h.label}
             percentage={h.threshold_ppm ? (h.measured_value / h.threshold_ppm) * 100 : null}
             measuredValue={h.measured_value}
@@ -48,10 +48,10 @@ export default function GasTable({ data }: { data: EnvironmentAnalysis | null })
           </tr>
         </thead>
         <tbody>
-          {data.hazards.map((h) => {
+          {data.hazards.map((h, idx) => {
             const Icon = trendIcon[h.trend];
             return (
-              <tr key={h.label} style={{ borderTop: "1px solid var(--border)" }}>
+              <tr key={`${h.label}-${idx}`} style={{ borderTop: "1px solid var(--border)" }}>
                 <td style={{ padding: "10px 8px 10px 0", fontWeight: 600 }}>{h.label}</td>
                 <td style={{ padding: "10px 8px" }} className="mono">
                   {h.measured_value} {h.unit}

@@ -57,6 +57,17 @@ async def set_zone_status(driver, zone_id: str, status: str) -> None:
         )
 
 
+def set_zone_status_sync(driver, zone_id: str, status: str) -> None:
+    """Sync twin of set_zone_status, for the API gateway's own sync Neo4j
+    driver. Without this, current_status is written once at seed time and
+    never again -- every node stays 'normal' regardless of real risk."""
+    with driver.session() as session:
+        session.run(
+            "MERGE (z:Zone {zone_id: $zone_id}) SET z.current_status = $status",
+            zone_id=zone_id, status=status,
+        )
+
+
 def seed_default_topology_sync(driver) -> None:
     """Sync twin of seed_default_topology, for the API gateway's own sync
     neo4j driver (FastAPI request handlers are sync). Same edges, idempotent."""

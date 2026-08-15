@@ -10,7 +10,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import StrEnum
+from enum import Enum
+
+try:
+    from enum import StrEnum
+except ImportError:  # Python < 3.11 -- StrEnum was only added in 3.11
+    class StrEnum(str, Enum):
+        pass
 
 
 class EvidenceType(StrEnum):

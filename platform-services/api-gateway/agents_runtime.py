@@ -87,10 +87,11 @@ class AgentHandle:
     """A running agent + the thread driving it, so callers can request a
     clean shutdown (used by the demo script and by API-gateway shutdown)."""
 
-    def __init__(self, name: str, runner: AgentRunner, thread: threading.Thread):
+    def __init__(self, name: str, runner: AgentRunner, thread: threading.Thread, agent=None):
         self.name = name
         self.runner = runner
         self.thread = thread
+        self.agent = agent
 
     def stop(self) -> None:
         self.runner.request_shutdown()
@@ -178,7 +179,7 @@ def _start_environmental_agent(schema_provider: LocalSchemaProvider) -> AgentHan
     )
     t = threading.Thread(target=runner.run, kwargs={"poll_timeout_seconds": 0.2}, daemon=True, name="env-agent")
     t.start()
-    return AgentHandle("environmental-intelligence-agent", runner, t)
+    return AgentHandle("environmental-intelligence-agent", runner, t, agent=agent)
 
 
 def _start_permit_agent(schema_provider: LocalSchemaProvider) -> AgentHandle:

@@ -65,12 +65,12 @@ class OrchestratorHandle:
         self._thread = thread
 
 
-def start_orchestrator(schema_provider: LocalSchemaProvider, response_agent=None) -> OrchestratorHandle:
+def start_orchestrator(schema_provider: LocalSchemaProvider, response_agent=None, on_persist=None) -> OrchestratorHandle:
     # response_agent (optional): its .handle(assessment) is called for every
     # finalized SystemRiskAssessment, turning it into an ActionRequest. The
     # orchestrator itself stays unaware of any response logic.
     on_assessment = response_agent.handle if response_agent is not None else None
-    publisher = bridge.CachingEventPublisher(on_assessment=on_assessment)
+    publisher = bridge.CachingEventPublisher(on_assessment=on_assessment, on_persist=on_persist)
     ready = threading.Event()
 
     def _thread_main() -> None:

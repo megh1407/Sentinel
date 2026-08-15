@@ -245,8 +245,10 @@ response_agent:
   consumes:
     topics:
       - sentinel.risk.score.v1
+      - sentinel.action.result.v1
     schemas:
       - risk_score
+      - action_result
   produces:
     topics:
       - sentinel.action.request.v1
@@ -254,6 +256,7 @@ response_agent:
       - action_request
   dependencies:
     - risk_orchestrator_agent
+    - action_gateway
   sla:
     max_processing_time_ms: 500
     min_confidence: 0.7

@@ -136,6 +136,17 @@ class EnvironmentalIntelligenceAgent(BaseAgent):
         self._audit_service = AuditService()
         self._diagnostics_service = DiagnosticsService()
 
+    def reset_demo_state(self) -> None:
+        """Demo/test-only: clears accumulated per-zone sensor buffers and
+        history. Must clear _aggregator/_history_manager IN PLACE (not
+        replace with new instances) -- _trend_service, _gas_leak_service,
+        and _historical_analytics_service were constructed holding a
+        reference to this exact _history_manager object, and swapping it
+        out here would leave them pointing at stale, now-orphaned state."""
+        self._aggregator.clear_all()
+        self._history_manager.clear()
+        self._last_values.clear()
+
     def process(self, event: BaseModel) -> BaseModel | list[BaseModel] | None:
         """
         Current behavior: consumes SensorEvent, folds it into the

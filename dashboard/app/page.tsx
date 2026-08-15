@@ -7,6 +7,8 @@ import SourceTag from "@/components/SourceTag";
 import PlantHeatmap from "@/components/PlantHeatmap";
 import PlantTopologyGraph from "@/components/PlantTopologyGraph";
 import LiveFeed from "@/components/LiveFeed";
+import SystemHealthBar from "@/components/SystemHealthBar";
+import DemoControls from "@/components/DemoControls";
 import { Users, Siren } from "lucide-react";
 
 /**
@@ -42,6 +44,9 @@ export default async function CommandCenter() {
         <h1>Command Center</h1>
         <p>Site-wide status, at a glance.</p>
       </div>
+
+      <SystemHealthBar />
+      <DemoControls />
 
       <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 20, alignItems: "center", marginBottom: 28 }}>
         <div className="card" style={{ padding: "22px 28px", display: "flex", alignItems: "center", gap: 16 }}>

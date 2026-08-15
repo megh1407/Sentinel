@@ -203,3 +203,114 @@ class ZoneRepository(PostgresRepository):
         with self.transaction() as session:
             return (session.query(ZoneHistoryRecord).filter_by(zone_id=zone_id)
                     .order_by(ZoneHistoryRecord.recorded_at.desc()).limit(limit).all())
+
+
+class RiskAssessmentRecord(Base):
+    """One row per finalized SystemRiskAssessment -- the durable audit trail
+    behind the dashboard's History page. Redis (state_cache.py /
+    CachingEventPublisher) stays the fast live-read path with no retention
+    guarantee across restarts/resets; this is what survives it."""
+    __tablename__ = "risk_assessments"
+    __table_args__ = {"schema": "risk_orchestrator"}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    assessment_id = Column(String, unique=True, nullable=False)
+    zone_id = Column(String, nullable=False, index=True)
+    site_id = Column(String, nullable=True)
+    global_score = Column(Float, nullable=False)
+    severity = Column(String, nullable=False, index=True)
+    decision_category = Column(String, nullable=False)
+    escalation_required = Column(String, nullable=False)
+    manual_review_required = Column(String, nullable=False)
+    explanation = Column(String, nullable=True)
+    recorded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class ActionRequestRecord(Base):
+    """One row per ResponseAgent decision -- the Response Agent's half of
+    the same audit trail, keyed to the RiskAssessmentRecord that caused it
+    via assessment_id (Kafka's causation_id, not a DB foreign key, since
+    the two are written from two independent in-process callbacks)."""
+    __tablename__ = "action_requests"
+    __table_args__ = {"schema": "risk_orchestrator"}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    action_id = Column(String, unique=True, nullable=False)
+    assessment_id = Column(String, nullable=False, index=True)
+    zone_id = Column(String, nullable=False, index=True)
+    action_type = Column(String, nullable=False)
+    urgency = Column(String, nullable=False)
+    classification = Column(String, nullable=False)
+    explanation = Column(String, nullable=True)
+    recorded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class HistoryRepository(PostgresRepository):
+    """Postgres-backed durability for the Risk Orchestrator + Response
+    Agent's decisions, feeding the dashboard's History page with real,
+    persisted records rather than fabricated fixtures."""
+
+    def ensure_schema(self) -> None:
+        with self.transaction() as session:
+            session.execute(text("CREATE SCHEMA IF NOT EXISTS risk_orchestrator"))
+        Base.metadata.create_all(
+            self._session_factory.kw["bind"],
+            tables=[RiskAssessmentRecord.__table__, ActionRequestRecord.__table__],
+        )
+
+    def record_risk_assessment(self, assessment_id: str, zone_id: str, site_id: str | None,
+                                global_score: float, severity: str, decision_category: str,
+                                escalation_required: bool, manual_review_required: bool,
+                                explanation: str | None) -> None:
+        with self.transaction() as session:
+            existing = session.query(RiskAssessmentRecord).filter_by(assessment_id=assessment_id).first()
+            if existing is None:  # idempotent -- same assessment_id can arrive more than once
+                session.add(RiskAssessmentRecord(
+                    assessment_id=assessment_id, zone_id=zone_id, site_id=site_id,
+                    global_score=global_score, severity=severity, decision_category=decision_category,
+                    escalation_required=str(escalation_required), manual_review_required=str(manual_review_required),
+                    explanation=explanation, recorded_at=datetime.now(timezone.utc),
+                ))
+
+    def record_action_request(self, action_id: str, assessment_id: str, zone_id: str,
+                               action_type: str, urgency: str, classification: str,
+                               explanation: str | None) -> None:
+        with self.transaction() as session:
+            existing = session.query(ActionRequestRecord).filter_by(action_id=action_id).first()
+            if existing is None:
+                session.add(ActionRequestRecord(
+                    action_id=action_id, assessment_id=assessment_id, zone_id=zone_id,
+                    action_type=action_type, urgency=urgency, classification=classification,
+                    explanation=explanation, recorded_at=datetime.now(timezone.utc),
+                ))
+
+    def get_history(self, limit: int = 100) -> list[dict]:
+        """Assessments joined (in Python, not SQL -- two independent write
+        paths as noted above) with their resulting action, newest first."""
+        with self.transaction() as session:
+            assessments = (session.query(RiskAssessmentRecord)
+                            .order_by(RiskAssessmentRecord.recorded_at.desc()).limit(limit).all())
+            results = []
+            for a in assessments:
+                action = (session.query(ActionRequestRecord)
+                          .filter_by(assessment_id=a.assessment_id).first())
+                results.append({
+                    "assessment_id": a.assessment_id,
+                    "zone_id": a.zone_id,
+                    "site_id": a.site_id,
+                    "global_score": a.global_score,
+                    "severity": a.severity,
+                    "decision_category": a.decision_category,
+                    "escalation_required": a.escalation_required == "True",
+                    "manual_review_required": a.manual_review_required == "True",
+                    "explanation": a.explanation,
+                    "recorded_at": a.recorded_at.isoformat(),
+                    "action": None if action is None else {
+                        "action_id": action.action_id,
+                        "action_type": action.action_type,
+                        "urgency": action.urgency,
+                        "classification": action.classification,
+                        "explanation": action.explanation,
+                    },
+                })
+            return results

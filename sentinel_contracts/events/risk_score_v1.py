@@ -24,6 +24,19 @@ class RiskScorePayload(BaseModel):
     contributing_agent_result_ids: list[str] = Field(default_factory=list)
     compound_rules_fired: list[str] = Field(default_factory=list)
     valid_until: datetime
+    # Additive v1 fields (non-breaking, see contracts/events/RiskScore/v1/schema.avsc).
+    # Empty/false means "not populated by the producer," never "confirmed absent."
+    affected_zones: list[str] = Field(default_factory=list)
+    affected_assets: list[str] = Field(default_factory=list)
+    human_exposure_confirmed: bool = False
+    critical_controls_unavailable: list[str] = Field(default_factory=list)
+    propagation_paths: list[str] = Field(default_factory=list)
+    cascade_paths: list[str] = Field(default_factory=list)
+    decision_category: str = ""
+    escalation_required: bool = False
+    manual_review_required: bool = False
+    analysis_completeness: str = "complete"
+    missing_domains: list[str] = Field(default_factory=list)
 
 
 class RiskScore(BaseModel):

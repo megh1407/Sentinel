@@ -221,6 +221,109 @@ export async function fetchActionRequests(): Promise<Record<string, any>> {
   return byZone;
 }
 
+/** Real, durably persisted risk-assessment + action-request history from
+ * Postgres. `available: false` means Postgres was unreachable at gateway
+ * startup -- distinct from `history: []`, which just means nothing has
+ * happened yet. Callers should render these two cases differently. */
+export interface HistoryEntry {
+  assessment_id: string;
+  zone_id: string;
+  site_id: string | null;
+  global_score: number;
+  severity: string;
+  decision_category: string;
+  escalation_required: boolean;
+  manual_review_required: boolean;
+  explanation: string | null;
+  recorded_at: string;
+  action: {
+    action_id: string;
+    action_type: string;
+    urgency: string;
+    classification: string;
+    explanation: string | null;
+  } | null;
+}
+
+export async function fetchHistory(limit = 50): Promise<{ history: HistoryEntry[]; available: boolean }> {
+  const res = await fetch(`${API_BASE}/api/history?limit=${limit}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`api-gateway /api/history returned ${res.status}`);
+  return res.json();
+}
+
+/** Real infra + pipeline health -- Redis/Postgres/Neo4j/Kafka connectivity,
+ * transport mode, and active agent/orchestrator/response status. */
+export interface HealthStatus {
+  status: string;
+  transport_mode: "memory" | "kafka";
+  components: { redis: boolean; postgres: boolean; neo4j: boolean; kafka: boolean | null };
+  agents: string[];
+  agents_active: number;
+  orchestrator_active: boolean;
+  response_agent_active: boolean;
+  zones_known: number;
+}
+
+export async function fetchHealth(): Promise<HealthStatus> {
+  const res = await fetch(`${API_BASE}/api/health`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`api-gateway /api/health returned ${res.status}`);
+  return res.json();
+}
+
+/** Deterministic Safety Explanation -- always available, no LLM required. */
+export interface AgentContribution {
+  agent: string;
+  impact: string;
+  findings: string[];
+}
+export interface SafetyExplanation {
+  assessment_id: string;
+  zone_id: string;
+  severity: string;
+  decision_category: string;
+  global_score: number;
+  summary: string;
+  situation: string;
+  why_this_matters: string;
+  primary_hazard: string | null;
+  top_risk_factors: string[];
+  agent_contributions: AgentContribution[];
+  is_compound_risk: boolean;
+  compound_risk_explanation: string | null;
+  affected_zones: string[];
+  propagation_impact: string[];
+  immediate_action: string | null;
+  confidence: number;
+  analysis_completeness: string;
+  missing_domains: string[];
+  analysis_limitations: string | null;
+}
+
+export async function fetchExplanation(zoneId: string): Promise<SafetyExplanation> {
+  const res = await fetch(`${API_BASE}/api/explanation/${zoneId}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`api-gateway /api/explanation returned ${res.status}`);
+  return res.json();
+}
+
+/** Ask the Safety Copilot a question, constrained to verified assessment
+ * data. `source` tells you whether the answer came from the LLM or the
+ * deterministic fallback -- always label this honestly in the UI. */
+export interface CopilotAnswer {
+  text: string;
+  source: "llm" | "deterministic";
+  model: string | null;
+}
+
+export async function askCopilot(zoneId: string, question: string): Promise<CopilotAnswer> {
+  const res = await fetch(`${API_BASE}/api/copilot/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ zone_id: zoneId, question }),
+  });
+  if (!res.ok) throw new Error(`api-gateway /api/copilot/ask returned ${res.status}`);
+  return res.json();
+}
+
 /** Fire a demo scenario (normal | gas-rise | compound-risk | multi-zone-emergency). */
 export async function runScenario(name: string): Promise<void> {
   await fetch(`${API_BASE}/api/demo/scenario/${name}`, { method: "POST" });

@@ -14,6 +14,13 @@ class ActionType(str, Enum):
     EVACUATE_ZONE = "EVACUATE_ZONE"
     NOTIFY_MAINTENANCE = "NOTIFY_MAINTENANCE"
     LOCKOUT_REQUEST = "LOCKOUT_REQUEST"
+    CREATE_INCIDENT = "CREATE_INCIDENT"
+    DISPATCH_RESPONSE_TEAM = "DISPATCH_RESPONSE_TEAM"
+    INCREASE_MONITORING = "INCREASE_MONITORING"
+    ISOLATE_ZONE = "ISOLATE_ZONE"
+    REQUEST_HUMAN_REVIEW = "REQUEST_HUMAN_REVIEW"
+    RESTRICT_ACCESS = "RESTRICT_ACCESS"
+    SHUTDOWN_REQUEST = "SHUTDOWN_REQUEST"
 
 
 class ActionUrgency(str, Enum):
@@ -21,6 +28,25 @@ class ActionUrgency(str, Enum):
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
     IMMEDIATE = "IMMEDIATE"
+
+
+class ActionPriority(str, Enum):
+    """Additive v1 enum (non-breaking). Distinct from urgency: how important
+    relative to other concurrent actions, not how fast."""
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+class ActionLifecycleState(str, Enum):
+    """Additive v1 enum (non-breaking). This ActionRequest's own state
+    machine, distinct from ActionResult.outcome."""
+    REQUESTED = "REQUESTED"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+    ESCALATED = "ESCALATED"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
 
 
 class ActionRequestPayload(BaseModel):
@@ -32,6 +58,14 @@ class ActionRequestPayload(BaseModel):
     urgency: ActionUrgency
     requires_human_approval: bool = True
     requires_dual_control: bool = False
+    # Additive v1 fields (non-breaking, see contracts/events/ActionRequest/v1/schema.avsc).
+    priority: ActionPriority = ActionPriority.MEDIUM
+    lifecycle_state: ActionLifecycleState = ActionLifecycleState.REQUESTED
+    emergency_triggered: bool = False
+    trigger_reason: str | None = None
+    acknowledgement_required: bool = False
+    acknowledgement_deadline: datetime | None = None
+    deadline: datetime | None = None
 
 
 class ActionRequest(BaseModel):

@@ -183,13 +183,16 @@ class CachingEventPublisher:
     wins) to match this integration pass's other read-side caches
     (state_cache.py) rather than inventing new persistence."""
 
-    def __init__(self, on_assessment=None) -> None:
+    def __init__(self, on_assessment=None, on_persist=None) -> None:
         self._latest: dict[str, Any] = {}
         self._by_id: dict[str, Any] = {}
         # Optional sink invoked with each finalized assessment -- used to feed
         # the Response Agent (assessment -> ActionRequest) without the
         # orchestrator knowing anything about response logic.
         self._on_assessment = on_assessment
+        # Optional sink for durable persistence (Postgres) -- same isolation
+        # principle: a persistence failure must never break risk publishing.
+        self._on_persist = on_persist
 
     async def publish(self, assessment) -> None:
         self._latest[assessment.zone_id] = assessment
@@ -199,6 +202,11 @@ class CachingEventPublisher:
                 self._on_assessment(assessment)
             except Exception:  # noqa: BLE001 -- a response failure must not break risk publishing
                 logger.exception("response_agent_failed", extra={"assessment_id": assessment.assessment_id})
+        if self._on_persist is not None:
+            try:
+                self._on_persist(assessment)
+            except Exception:  # noqa: BLE001 -- a persistence failure must not break risk publishing
+                logger.exception("risk_assessment_persist_failed", extra={"assessment_id": assessment.assessment_id})
         logger.info(
             "system_risk_assessment_cached",
             extra={

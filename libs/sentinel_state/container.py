@@ -10,11 +10,14 @@ up), matching the health-check design in Part 9.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import redis
 from neo4j import Driver
-from qdrant_client import QdrantClient
 from sqlalchemy.orm import sessionmaker
+
+if TYPE_CHECKING:
+    from qdrant_client import QdrantClient
 
 from .graph_repositories import AssetGraphRepository, ZoneGraphRepository
 from .postgres_repositories import HelloSeenRepository, ZoneRepository

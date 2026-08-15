@@ -1,15 +1,43 @@
 "use client";
 
-import { useState } from "react";
-import { zones } from "@/lib/mockData";
-import { zoneStatus, statusColor } from "@/lib/viewModels";
-import EmergencyOverlay from "@/components/EmergencyOverlay";
+import { useEffect, useState } from "react";
+import { fetchZoneRecords, fetchRiskAssessments, fetchActionRequests } from "@/lib/api";
+import { RiskScore, ZoneRecord } from "@/lib/contracts";
+import EmergencyOverlay, { EmergencyActionRequest } from "@/components/EmergencyOverlay";
 import Link from "next/link";
 import { Siren } from "lucide-react";
 
+const CRITICAL_SEVERITIES = new Set(["catastrophic", "critical"]);
+
 export default function EmergencyPage() {
-  const critical = zones.filter((z) => zoneStatus(z.state.current_risk_level) === "CRITICAL");
+  const [zones, setZones] = useState<ZoneRecord[]>([]);
+  const [actions, setActions] = useState<Record<string, EmergencyActionRequest>>({});
   const [openZone, setOpenZone] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [zoneRecords, actionsByZone] = await Promise.all([fetchZoneRecords(), fetchActionRequests()]);
+        if (cancelled) return;
+        setZones(zoneRecords);
+        setActions(actionsByZone);
+      } catch {
+        // gateway unreachable -- leave lists empty rather than fabricating
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    const id = setInterval(load, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  const critical = zones.filter((z) => z.riskScore && CRITICAL_SEVERITIES.has(z.riskScore.severity));
 
   return (
     <div>
@@ -18,7 +46,7 @@ export default function EmergencyPage() {
         <p>Active critical events requiring acknowledgement or response.</p>
       </div>
 
-      {critical.length === 0 && (
+      {!loading && critical.length === 0 && (
         <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--text-secondary)" }}>
           No active emergencies. All zones within acceptable risk levels.
         </div>
@@ -26,7 +54,7 @@ export default function EmergencyPage() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {critical.map((zone) => {
-          const top = zone.anomalies[0];
+          const risk = zone.riskScore as RiskScore;
           return (
             <div
               key={zone.zoneId}
@@ -44,7 +72,7 @@ export default function EmergencyPage() {
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14.5 }}>{zone.displayName}</div>
                   <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 3, maxWidth: 520 }}>
-                    {top?.explanation.summary}
+                    {actions[zone.zoneId]?.explanation ?? risk.explanation_summary}
                   </div>
                 </div>
               </div>
@@ -83,8 +111,16 @@ export default function EmergencyPage() {
 
       {openZone &&
         (() => {
-          const z = zones.find((z) => z.zoneId === openZone);
-          return z ? <EmergencyOverlay key={z.zoneId} zone={z} /> : null;
+          const zone = zones.find((z) => z.zoneId === openZone);
+          if (!zone?.riskScore) return null;
+          return (
+            <EmergencyOverlay
+              zoneId={zone.zoneId}
+              risk={zone.riskScore}
+              action={actions[zone.zoneId] ?? null}
+              onDismiss={() => setOpenZone(null)}
+            />
+          );
         })()}
     </div>
   );
