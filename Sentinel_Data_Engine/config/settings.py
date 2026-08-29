@@ -6,6 +6,7 @@ Global Settings
 """
 
 from pathlib import Path
+import os
 
 # ============================================================
 # Project
@@ -54,16 +55,22 @@ TOTAL_MACHINES = 20
 # ============================================================
 # Database
 # ============================================================
+# Phase 3 remediation note (SENTINEL forensic audit, security baseline):
+# these were previously hardcoded literals, including a literal password.
+# Moved to environment variables with the same local-dev values as
+# defaults, so nothing about local/demo behavior changes, but a real
+# deployment is no longer forced to use (or silently inherit) this
+# literal credential -- it can override via env vars instead.
 
-DB_HOST = "localhost"
+DB_HOST = os.environ.get("SENTINEL_DB_HOST", "localhost")
 
-DB_PORT = 5432
+DB_PORT = int(os.environ.get("SENTINEL_DB_PORT", "5432"))
 
-DB_NAME = "sentinel"
+DB_NAME = os.environ.get("SENTINEL_DB_NAME", "sentinel")
 
-DB_USER = "postgres"
+DB_USER = os.environ.get("SENTINEL_DB_USER", "postgres")
 
-DB_PASSWORD = "postgres"
+DB_PASSWORD = os.environ.get("SENTINEL_DB_PASSWORD", "postgres")
 
 # ============================================================
 # Random Seed

@@ -312,8 +312,7 @@ class ContextBuilder:
             if len(context.evidence) == 0:
                 raise ContextValidationError(
                     "Populated context has no supporting evidence",
-                    zone_id=context.zone_id,
-                    reasons=["missing_evidence"],
+                    metadata={"zone_id": context.zone_id, "reasons": ["missing_evidence"]},
                 )
 
         quality = ContextQuality(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchZoneRecords, fetchRiskAssessments, fetchActionRequests } from "@/lib/api";
+import { fetchZoneRecords, fetchActionRequests } from "@/lib/api";
 import { RiskScore, ZoneRecord } from "@/lib/contracts";
 import EmergencyOverlay, { EmergencyActionRequest } from "@/components/EmergencyOverlay";
 import Link from "next/link";

@@ -1,24 +1,29 @@
 """
 test_worker_analysis_publish_gap.py
 
-Master prompt's "no assumptions" rule applies to platform gaps too: don't
-just assert a gap exists because the code reads that way -- prove it by
-running the real code and watching it fail. This test does that for the
-gap documented in worker_safety_agent.py and main.py.
+This module originally documented (and experimentally proved) a real gap:
+`LocalSchemaProvider` only preloaded `contracts/events/*` schemas, not
+`contracts/agent-contracts/*` schemas, so publishing a `WorkerAnalysis`
+(or any other intelligence agent's analysis output) failed with
+"no local schema registered". That gap has since been closed --
+`sentinel_eventbus/schema_provider.py`'s `_preload()` now loads agent-
+contract schemas too (see that file's own comment for the history) -- and
+`platform-services/api-gateway`'s `orchestrator_runtime.py`/`state_cache.py`
+already register `WorkerAnalysisV1` under the `"WorkerAnalysis"` key in
+their own real `model_registry` dicts, confirming this is the canonical,
+already-working registration path, not a new one invented here.
 
-Uses a throwaway Pydantic class named `WorkerAnalysis` purely as a
-publish() call target to exercise LocalSchemaProvider's real resolution
-path -- this is NOT a stand-in wire model (it's never used to actually
-carry PPE data anywhere, never registered in any EVENT_TYPES/model_registry,
-and this test is the only place it's ever instantiated). Its only job is
-to have the class name "WorkerAnalysis" so EventProducer.publish()'s
-`getattr(event, "event_type", type(event).__name__)` resolves to the same
-string LocalSchemaProvider would need to have preloaded.
+Phase 2 remediation note (SENTINEL forensic audit, P0-3): these two tests
+were not updated when the schema-provider fix landed, so they kept
+asserting the pre-fix failure modes (`KeyError` / `FatalError`) that no
+longer occur -- i.e. the *tests* were stale, not the implementation.
+Verified via `git log`-equivalent reasoning is unavailable here, but the
+evidence is direct: running the fix's own code path today no longer
+raises either exception. Rewritten below to assert the current, correct,
+intended behavior instead of the historical gap.
 """
-import pytest
 from pydantic import BaseModel
 
-from sentinel_common.errors import FatalError
 from sentinel_eventbus import EventProducer, InMemoryTransport, LocalSchemaProvider
 
 
@@ -29,25 +34,77 @@ class WorkerAnalysis(BaseModel):
     ppe_violations: list[str]
 
 
-def test_local_schema_provider_never_preloads_agent_contracts():
-    """Gap component 2 (see worker_safety_agent.py): confirms directly,
-    without going through publish(), that WorkerAnalysis was never loaded
-    -- proving this is a schema-provider limitation, not a coincidental
-    naming mismatch."""
+def test_local_schema_provider_preloads_agent_contracts():
+    """Confirms directly, without going through publish(), that
+    WorkerAnalysis (an agent-contracts/ schema, not an events/ schema) is
+    now preloaded by LocalSchemaProvider -- proving the schema-provider
+    fix covers agent-contract schemas generally, not just this one type
+    as a special case."""
     provider = LocalSchemaProvider()
-    with pytest.raises(KeyError, match="no local schema registered for WorkerAnalysis"):
-        provider.get_schema_and_id("WorkerAnalysis", 1)
+    schema, schema_id = provider.get_schema_and_id("WorkerAnalysis", 1)
+    assert schema is not None
+    assert isinstance(schema_id, int)
 
 
-def test_publishing_worker_analysis_raises_fatal_error():
-    """Gap component 2, end-to-end through the real publish() path."""
+def test_publishing_worker_analysis_succeeds():
+    """End-to-end through the real publish() path, using a fully-formed
+    real WorkerAnalysisV1 (not a minimal stand-in -- the full envelope,
+    including required fields like event_id, is part of what Avro
+    encoding actually needs, so a partial model isn't a fair proof
+    here): an agent-contracts event type now resolves a schema and
+    publishes without error, the same way an events/ type like
+    WorkerEvent always could."""
+    import datetime
+    import uuid
+
+    from sentinel_contracts.common.confidence_score import ConfidenceDerivation, ConfidenceScore
+    from sentinel_contracts.common.explanation_object import ExplanationObject
+    from sentinel_contracts.common.metadata import Environment, Metadata
+    from sentinel_contracts.agent_contracts.worker_analysis_v1 import (
+        WorkerAnalysisPayload, WorkerAnalysisV1, WorkerSafetyStatus,
+    )
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    event = WorkerAnalysisV1(
+        event_id=uuid.uuid4(),
+        event_timestamp=now,
+        correlation_id=uuid.uuid4(),
+        producer_service="worker_safety_agent",
+        producer_version="0.2.0",
+        site_id="SITE-01",
+        zone_id="Z-104",
+        partition_key="Z-104",
+        metadata=Metadata(schema_id=1, schema_version=1, environment=Environment.DEV),
+        agent_id="worker_safety_agent",
+        agent_version="0.2.0",
+        input_events=[uuid.uuid4()],
+        confidence=1.0,
+        processing_time_ms=0,
+        explanation=ExplanationObject(
+            summary="Worker W-1 is missing required PPE: gloves in zone Z-104.",
+            confidence=ConfidenceScore(value=1.0, derivation=ConfidenceDerivation.RULE_BASED),
+            evidence=[],
+            reasoning_steps=[],
+            generated_at=now,
+        ),
+        payload=WorkerAnalysisPayload(
+            worker_id="W-1",
+            risk_score=50.0,
+            confidence=1.0,
+            safety_status=WorkerSafetyStatus.at_risk,
+            ppe_compliance=0.5,
+            ppe_violations=["gloves"],
+            evidence=[],
+            recommendations=[],
+            analyzed_at=now,
+        ),
+    )
+
     schema_provider = LocalSchemaProvider()
     producer = EventProducer(InMemoryTransport(client_id="p"), schema_provider)
 
-    event = WorkerAnalysis(worker_id="W-1", ppe_compliance=0.5, ppe_violations=["gloves"])
-
-    with pytest.raises(FatalError, match="could not resolve schema for WorkerAnalysis"):
-        producer.publish("sentinel.worker.analysis.v1", event)
+    result = producer.publish("sentinel.worker.analysis.v1", event)
+    assert result is not None
 
 
 def test_worker_event_by_contrast_publishes_fine():

@@ -1,0 +1,26 @@
+# Phase 5 remediation note (SENTINEL forensic audit, Docker safety):
+# the api-gateway Dockerfile's build context is the repo root (see that
+# file's own header for why), so this keeps caches, local envs, and
+# anything env/secret-shaped out of the image, on top of only ever
+# COPYing the specific subtrees it actually needs.
+
+.git/
+.github/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+dashboard/node_modules/
+dashboard/.next/
+
+*.log
+*.tmp
+*.bak
+
+sync_files.py

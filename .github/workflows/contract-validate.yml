@@ -40,6 +40,13 @@ on:
       - "schema_loader.py"
       - "envelope_conformance_lint.py"
 
+# Phase 5 remediation note (SENTINEL forensic audit, CI hardening):
+# explicit least-privilege permissions -- this workflow only reads the
+# checked-out code and runs local scripts, it never needs to write
+# anything back to the repository.
+permissions:
+  contents: read
+
 jobs:
   validate:
     name: Avro syntax + envelope conformance

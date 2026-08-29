@@ -1,0 +1,66 @@
+# contract-test.yml
+#
+# Phase 2 remediation note (SENTINEL forensic audit, P1-3): this file was
+# previously empty (0 bytes) -- present in the workflow directory but not
+# executable. contract-validate.yml (this repo's other workflow) checks
+# schema/envelope shape only; nothing ran the Python unit/integration test
+# suites in CI. This workflow does that, using exactly the same command
+# `make test` runs locally (see root Makefile) so "passes in CI" and
+# "passes locally" can never silently diverge.
+#
+# Scope matches Makefile's `test` target deliberately: the three agents
+# with a supported, infrastructure-free test suite
+# (environmental-intelligence-agent, risk-orchestrator-agent's tests/unit,
+# worker-safety-agent). Agents without a wired test suite, and test
+# directories that require live infrastructure (Redis/Postgres/Neo4j/Kafka),
+# are out of scope here for the same reason they're out of scope for
+# `make test` -- see README.md's "Tests" section for the full list.
+
+name: Contract Test
+
+on:
+  pull_request:
+    paths:
+      - "agents/environmental-intelligence-agent/**"
+      - "agents/risk-orchestrator-agent/**"
+      - "agents/worker-safety-agent/**"
+      - "libs/**"
+      - "sentinel_contracts/**"
+      - "requirements.txt"
+      - "Makefile"
+  push:
+    branches:
+      - main
+    paths:
+      - "agents/environmental-intelligence-agent/**"
+      - "agents/risk-orchestrator-agent/**"
+      - "agents/worker-safety-agent/**"
+      - "libs/**"
+      - "sentinel_contracts/**"
+      - "requirements.txt"
+      - "Makefile"
+
+# Phase 5 remediation note (SENTINEL forensic audit, CI hardening):
+# explicit least-privilege permissions -- this workflow only checks out
+# code and runs pytest, it never needs to write anything back.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python test suites
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: make install
+
+      - name: Run supported agent test suites
+        run: make test

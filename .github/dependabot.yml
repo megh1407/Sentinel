@@ -1,0 +1,24 @@
+# Phase 5 remediation note (SENTINEL forensic audit, dependency hygiene):
+# this file only configures Dependabot's behavior once it's active for
+# this repository -- it does NOT itself enable Dependabot. Enabling
+# Dependabot version updates and/or security updates is a GitHub
+# repository setting the owner must turn on (Settings -> Code security
+# and analysis) -- see README.md's "Owner decisions" note.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "npm"
+    directory: "/dashboard"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

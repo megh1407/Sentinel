@@ -56,7 +56,18 @@ def test_ppe_status_event_is_evaluated_and_logged():
 
     result = agent.process(event)
 
-    assert result is None  # see worker_safety_agent.py's docstring for why
+    # Phase 2 remediation note (SENTINEL forensic audit, P1-2): this used
+    # to assert `result is None`, per a documented (now-closed) gap --
+    # see worker_safety_agent.py's module docstring, which states
+    # process() "now builds and returns a real WorkerAnalysisV1" and
+    # names the same two gaps (no generated model, schema provider never
+    # preloaded agent-contracts) closed elsewhere in this remediation.
+    # The stale side here was this assertion, not the implementation.
+    from sentinel_contracts.agent_contracts.worker_analysis_v1 import WorkerAnalysisV1, WorkerSafetyStatus
+
+    assert isinstance(result, WorkerAnalysisV1)
+    assert result.payload.ppe_violations == ["vest"]
+    assert result.payload.safety_status == WorkerSafetyStatus.at_risk
     assert "W-1" in agent.last_results
     computed = agent.last_results["W-1"]
     assert computed.ppe_violations == ["vest"]

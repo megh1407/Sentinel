@@ -1,0 +1,16 @@
+# worker-safety-agent — pytest configuration
+#
+# Was previously an empty file. This agent's own `tests/conftest.py`
+# already inserts the repo root, `libs/`, and this agent's own
+# `src/worker_safety_agent` onto sys.path (needed for its tests' bare
+# `from config import ...`-style imports), so this file only needs to
+# add `sentinel_contracts` and enable asyncio auto mode -- both were
+# previously left to a contributor's manually-exported PYTHONPATH
+# (Phase 1 audit, P0-4/P1-4).
+#
+# Run from this directory: `pytest tests`
+
+[tool.pytest.ini_options]
+pythonpath = ["../../sentinel_contracts"]
+asyncio_mode = "auto"
+testpaths = ["tests"]

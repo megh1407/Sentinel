@@ -18,6 +18,7 @@ its full explanation, so you can see the actual decision, not just a
 pass/fail dot.
 """
 import datetime
+import os
 import sys
 import uuid
 
@@ -135,7 +136,14 @@ def build_agent():
     postgres_session_factory = None
     try:
         from sentinel_state.postgres_repositories import ZoneRepository
-        engine = build_engine("postgresql+psycopg2://postgres:localdev@localhost:5432/sentinel")
+        # Phase 3 remediation note (SENTINEL forensic audit, security
+        # baseline): was a hardcoded DSN with a literal password. Same
+        # local-dev default, now overridable via env var.
+        dsn = os.environ.get(
+            "SENTINEL_DEMO_POSTGRES_DSN",
+            "postgresql+psycopg2://postgres:localdev@localhost:5432/sentinel",
+        )
+        engine = build_engine(dsn)
         postgres_session_factory = build_session_factory(engine)
         ZoneRepository(postgres_session_factory).ensure_schema()
         print("Postgres: connected -- zone_history/anomalies/audit_events will be written for real.")

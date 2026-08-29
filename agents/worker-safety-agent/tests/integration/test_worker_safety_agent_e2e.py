@@ -1,12 +1,10 @@
 """
 test_worker_safety_agent_e2e.py
 
-Proves the REAL platform path for the half of the pipeline that is not
-blocked, using the actual EventProducer/EventConsumer/AgentRunner/
-InMemoryTransport/LocalSchemaProvider -- not a fake harness, and not
-calling agent.process(event) directly and calling that "Kafka
-integration" (the master prompt explicitly warns against exactly that
-shortcut in its "Demo Mode" section):
+Proves the REAL platform path, using the actual EventProducer/
+EventConsumer/AgentRunner/InMemoryTransport/LocalSchemaProvider -- not a
+fake harness, and not calling agent.process(event) directly and calling
+that "Kafka integration":
 
     real WorkerEventV1
         -> real EventProducer.publish("sentinel.worker.events.v1", ...)
@@ -14,21 +12,36 @@ shortcut in its "Demo Mode" section):
         -> real EventConsumer.poll_once()
         -> real AgentRunner._process_message()
         -> WorkerSafetyAgent.process() (the real business logic)
+        -> real AgentRunner publish of the returned WorkerAnalysisV1
+        -> real EventConsumer.poll_once() on the output topic
 
 then verifies:
   1. the message was actually consumed and the offset committed
   2. the agent's PPE evaluation actually ran (last_results populated
      correctly)
-  3. NOTHING was published to sentinel.worker.analysis.v1 -- not because
-     of a bug, but because process() legitimately returns None given the
-     documented, verified gap (see worker_safety_agent.py, main.py, and
-     test_worker_analysis_publish_gap.py in this same directory for the
-     experimental proof of *why* it can't publish yet)
+  3. a real WorkerAnalysisV1 was published to sentinel.worker.analysis.v1
+     and is independently readable back by a fresh consumer group
+
+Phase 2 remediation note (SENTINEL forensic audit, P0-3): this test
+previously asserted the opposite of point 3 above ("nothing was ever
+produced"), documenting a real gap that has since been closed (see
+worker_safety_agent.py's module docstring and
+test_worker_analysis_publish_gap.py, both updated in the same
+remediation pass). The `verify_consumer` below previously registered an
+empty model_registry (`{}`), which was correct for the old "nothing is
+ever published" premise but caused this test to fail after the fix
+landed -- the event now genuinely gets published, and an empty registry
+made it look, from `verify_consumer`'s point of view, like an
+unrecognized event type. Registered under `"WorkerAnalysis"` here to
+match the exact same key `platform-services/api-gateway`'s
+`orchestrator_runtime.py`/`state_cache.py` already use for their real
+`model_registry` -- not a new naming decision.
 """
 import datetime
 import uuid
 
 from sentinel_agent_sdk import AgentRunner
+from sentinel_contracts.agent_contracts.worker_analysis_v1 import WorkerAnalysisV1, WorkerSafetyStatus
 from sentinel_contracts.common.metadata import Environment, Metadata
 from sentinel_contracts.events.worker_event_v1 import WorkerEventKind, WorkerEventPayload, WorkerEventV1
 from sentinel_eventbus import EventConsumer, EventProducer, InMemoryTransport, LocalSchemaProvider
@@ -48,7 +61,7 @@ def _make_event(worker_id: str, zone_id: str, ppe_status: dict) -> WorkerEventV1
     )
 
 
-def test_real_kafka_round_trip_evaluates_ppe_and_publishes_nothing():
+def test_real_kafka_round_trip_evaluates_ppe_and_publishes_worker_analysis():
     schema_provider = LocalSchemaProvider()
     producer_transport = InMemoryTransport(client_id="p")
     consumer_transport = InMemoryTransport(client_id="c")
@@ -77,13 +90,20 @@ def test_real_kafka_round_trip_evaluates_ppe_and_publishes_nothing():
     assert result.ppe_violations == ["gloves"]
     assert result.zone_id == "Z-104"
 
-    # (3) nothing published -- verified by actually polling the output
-    # topic with a fresh consumer group, not by inspecting internals
+    # (3) a real WorkerAnalysisV1 was published -- verified by actually
+    # polling the output topic with a fresh consumer group, not by
+    # inspecting internals
     verify_transport = InMemoryTransport(client_id="verify")
-    verify_consumer = EventConsumer(verify_transport, schema_provider, {}, group_id="verify-worker-analysis")
+    verify_consumer = EventConsumer(
+        verify_transport, schema_provider, {"WorkerAnalysis": WorkerAnalysisV1}, group_id="verify-worker-analysis",
+    )
     received = []
     verify_consumer.subscribe(["sentinel.worker.analysis.v1"], handler=lambda e: received.append(e))
-    outcome = verify_consumer.poll_once()
+    verify_consumer.poll_once()
 
-    assert outcome is None  # nothing was ever produced to this topic
-    assert received == []
+    assert len(received) == 1
+    analysis = received[0]
+    assert isinstance(analysis, WorkerAnalysisV1)
+    assert analysis.payload.worker_id == "W-42"
+    assert analysis.payload.ppe_violations == ["gloves"]
+    assert analysis.payload.safety_status == WorkerSafetyStatus.at_risk

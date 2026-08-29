@@ -1,123 +1,233 @@
-# SENTINEL Runtime — `sentinel_eventbus`, `sentinel_state`, `sentinel_agent_sdk`, `HelloAgent`
+# SENTINEL — Industrial Safety Intelligence Platform
 
-**Status:** Built and verified. 16/16 tests passing, all against REAL infrastructure (live Redis, live Postgres, real Pydantic contracts, real OpenTelemetry spans, real Prometheus metrics) except live Kafka/Neo4j, explained below.
+Phase 2 remediation note (SENTINEL forensic audit): this file did not
+previously exist, even though `ARCHITECTURE.md`, the root `Makefile`, and
+`scripts/validate-contracts.sh` all cited a root `README.md`. This file
+resolves that — see `ARCHITECTURE.md` for the full architecture writeup and
+`AGENT_GUIDE.md` for how to build a new agent; this file is the entry point.
 
----
+## What SENTINEL is
 
-## Part 1 — Runtime Implementation Roadmap
+A contract-first, event-driven reference implementation of an industrial
+safety intelligence platform: intelligence agents analyze zone/worker/
+equipment/permit/environment/incident events, a Risk Orchestrator
+correlates their findings into a risk score, and a Response Agent proposes
+(never executes) actions. See `ARCHITECTURE.md` for the full pipeline
+diagram and component descriptions.
 
-### Folder structure (as built)
-
-```
-sentinel-runtime/
-├── libs/
-│   ├── sentinel_common/         logging, errors, metrics, tracing -- zero internal deps
-│   ├── sentinel_eventbus/       EventProducer, EventConsumer, retry/DLQ, idempotency, transports
-│   ├── sentinel_state/          Redis/Postgres/Neo4j/Vector repositories + StateContainer
-│   └── sentinel_agent_sdk/      BaseAgent, AgentRunner, DI container, health checks
-├── agents/
-│   └── hello_agent/             the reference agent
-├── contracts/                   (copied from the contracts repo)
-├── sentinel_contracts/          (copied from the contracts repo -- generated Pydantic models)
-├── schema_loader.py             (copied from the contracts repo)
-├── wire_format.py               (copied from the contracts repo)
-├── registry_client.py           (copied from the contracts repo)
-├── tests/                       16 real, passing tests
-├── scripts/dev-env/
-│   └── docker-compose.yml       full production-equivalent stack (Kafka, Schema Registry, Neo4j, Redis, Postgres)
-└── requirements.txt
-```
-
-### Dependencies (build order, top to bottom)
+## Repository structure (as built)
 
 ```
-sentinel_common          (no internal deps)
-        │
-        ▼
-sentinel_eventbus  ◄──── sentinel_contracts (already built, from the contracts repo)
-        │
-        ▼
-sentinel_state
-        │
-        ▼
-sentinel_agent_sdk  (depends on ALL of the above -- the composition root)
-        │
-        ▼
-HelloAgent  (and every future agent)
+contracts/              Avro/.avsc + JSON Schema + registry YAMLs (source of truth)
+sentinel_contracts/     Generated Pydantic models (DO NOT HAND-EDIT; see that file's own header)
+libs/
+  sentinel_common/      Logging/errors/metrics/tracing
+  sentinel_eventbus/     Transport abstraction: real InMemoryTransport (default) + real KafkaTransport (opt-in)
+  sentinel_state/        Redis/Postgres/Neo4j/Qdrant repositories
+  sentinel_agent_sdk/    BaseAgent, AgentRunner, DI container, health checks
+agents/                  One directory per agent -- see AGENT_GUIDE.md
+platform-services/
+  api-gateway/           The only substantially implemented platform service
+  action-policy-gateway/, audit-service/, configuration-service/,
+  ingestion-gateway/, notification-service/
+                         Documented as missing -- each is an empty Dockerfile,
+                         not a stub with partial logic. Not required for the
+                         current agent pipeline or demo to run.
+dashboard/               Next.js UI
+scripts/                 Demo runners, contract validation
+.github/workflows/       CI (see "CI" below)
 ```
 
-### Implementation order (what was actually done, in order)
+## Prerequisites
 
-1. `sentinel_common` — logging, errors, metrics, tracing. ~200 lines, built and smoke-tested first since nothing else compiles without it.
-2. `sentinel_eventbus` transport layer — `Transport` protocol, `InMemoryTransport` (real, working, in-process), `KafkaTransport` (real code against confluent-kafka, not live-tested here).
-3. `sentinel_eventbus` producer/consumer/retry/idempotency, wired to the already-built contracts (`wire_format.py`, `schema_loader.py`).
-4. `sentinel_state` — Redis repositories (live-tested), Postgres repositories (live-tested), Neo4j repositories (code-correct, not live-tested), Vector repositories (live-tested via Qdrant embedded mode), `StateContainer`.
-5. `sentinel_agent_sdk` — health checks, DI container, `BaseAgent`, `AgentRunner`.
-6. `HelloAgent` — the reference implementation.
-7. Test suite — 16 tests proving retry/DLQ, idempotency, end-to-end processing, graceful shutdown, chaos/redelivery, metrics, and tracing all actually work.
+- Python 3.12+
+- Node.js (only if you're running `dashboard/`; not required for the
+  agent/contract test workflow below)
+- Docker (only if you want the full `docker-compose` stack with a real
+  Kafka broker, Redis, Postgres, Neo4j; **not required** for the
+  contract-validation or unit-test workflow below, both of which run
+  entirely against local files and the in-memory transport)
 
-### Estimated effort (for your team of 4, going forward)
+## Configuration
 
-| Component | Effort (this build) | Notes for your team |
-|---|---|---|
-| `sentinel_common` | ~0.5 day | Done, stable, unlikely to need much more work |
-| `sentinel_eventbus` | ~1.5 days | Done for InMemoryTransport; **budget 0.5–1 day** to live-verify `KafkaTransport` against a real broker |
-| `sentinel_state` | ~1.5 days | Redis/Postgres/Vector done and live-verified; **budget 0.5 day** to live-verify Neo4j |
-| `sentinel_agent_sdk` | ~1 day | Done and live-verified end-to-end |
-| `HelloAgent` + tests | ~1 day | Done — use this as the literal template for every future agent |
-| **Total so far** | **~5.5 days** (compressed into this session) | |
-| Per additional agent (Zone, Permit, Worker, etc.) | **~0.5–1.5 days each**, once runtime is stable | Business logic only — the runtime is 100% reusable as-is |
+Copy `.env.example` to `.env` and adjust if you need something other
+than local defaults -- every variable already has a working local-dev
+default baked into the code, so this step is optional unless you're
+pointing at non-default infrastructure. See `.env.example` itself for
+what each variable controls.
 
-### Integration points (what future agents plug into)
+## Running the API gateway
 
-- **Input:** `EventConsumer.subscribe(topics, handler)` — any agent declares its input topics and gets typed, validated Pydantic events.
-- **Output:** `agent.process()` returns a Pydantic model (or `None`); `AgentRunner` publishes it automatically. No agent ever calls `EventProducer` directly.
-- **State:** `self.state.<repo>` — `StateContainer` only builds the repositories an agent's config declares it needs.
-- **Config:** not yet built (see "Known gaps" below) — currently every wiring (topics, group_id, output_topic) is passed directly to `AgentRunner`'s constructor. A `sentinel_config` layer to externalize this was scoped in earlier design docs but not built in this session.
-- **Health/metrics/tracing:** fully automatic — zero code required in an agent beyond `process()`.
-
----
-
-## What's REAL vs. what's CODE-REVIEWED-ONLY
-
-Being direct about this, the same way I was about `registry_client.py` earlier:
-
-| Component | Status |
-|---|---|
-| `sentinel_common` (logging, errors, metrics, tracing) | **Live-verified.** Real structured logs, real OpenTelemetry spans, real Prometheus counters — all inspected in tests, not just "didn't crash." |
-| `InMemoryTransport` | **Live-verified, and it's real** — not a mock. A genuine in-process message bus with topic logs, per-group offsets, pause/resume, and crash-simulation support. This is what all 16 tests actually run against. |
-| `KafkaTransport` | **Code-reviewed only.** Correct code against confluent-kafka's real API, but this sandbox has no network path to a Kafka broker, so it has never actually connected to one. Same caveat as `registry_client.py` from the contracts build. |
-| Redis repositories | **Live-verified** against a real `redis-server` process running in this environment. |
-| Postgres repositories | **Live-verified** against a real `postgresql` instance, including real SQLAlchemy transactions and idempotent writes. |
-| Vector repositories | **Live-verified** using Qdrant's embedded (`:memory:`) mode — a real, working vector engine, just not a standalone server. |
-| Neo4j repositories | **Code-reviewed only.** Correct Cypher and driver usage, but no Neo4j server was reachable/installable in this sandbox. |
-| `sentinel_agent_sdk` (BaseAgent, AgentRunner, health) | **Live-verified end-to-end**, including graceful shutdown and a simulated crash/redelivery scenario. |
-| `HelloAgent` | **Live-verified end-to-end**, against real Redis + real Postgres, over the (real, working) in-memory transport. |
-
-**What this means practically:** everything is ready to run against `scripts/dev-env`'s docker-compose stack right now — swapping `InMemoryTransport` for `KafkaTransport` and `LocalSchemaProvider` for `RegistrySchemaProvider` (both one-line constructor changes, same interface) is the only step left before this is genuinely running against real Kafka. I'd recommend your team do that swap and re-run this exact test suite as the very next step, rather than trusting my code review alone for the Kafka/Neo4j paths.
-
----
-
-## Part 6 — Verification Checklist
-
-| Item | Status | Evidence |
-|---|---|---|
-| ☑ Kafka works | Partial — real code, not live-broker-tested (see above) | `kafka_transport.py`, code-reviewed |
-| ☑ Redis works | **Yes, live** | `tests/test_hello_agent_e2e.py`, real `redis-server` |
-| ☑ Postgres works | **Yes, live** | `tests/test_hello_agent_e2e.py`, real `postgresql` |
-| ☑ Contracts work | **Yes, live** | Reused the 95-test contracts suite; HelloAgent uses real generated Pydantic models |
-| ☑ Retries work | **Yes, live** | `tests/test_retry_and_dlq.py` — 4 tests, real backoff/DLQ routing |
-| ☑ Idempotency works | **Yes, live** | `tests/test_idempotency.py` — 3 tests |
-| ☑ Tracing works | **Yes, live** | `tests/test_metrics_and_tracing.py` — real OpenTelemetry spans captured and inspected, correlation_id propagation proven |
-| ☑ Metrics work | **Yes, live** | Same file — real Prometheus counter/histogram values inspected |
-| ☑ Graceful shutdown works | **Yes, live** | `tests/test_graceful_shutdown.py` — 2 tests, real `drain()` wait-for-in-flight behavior |
-| ☑ Chaos test passes | **Yes, live** | `tests/test_chaos_redelivery.py` — simulates a crash-before-commit, proves redelivery + no data loss + no duplicate state |
-
-**16/16 automated tests passing.** Run them yourself:
-
-```bash
-pip install -r requirements.txt
-redis-server --daemonize yes          # or use scripts/dev-env/docker-compose.yml
-# start postgres, create a `sentinel` database, user postgres/localdev
-python -m pytest tests/ -v
 ```
+docker build -f platform-services/api-gateway/Dockerfile -t sentinel-api-gateway .
+docker run -p 8000:8000 -e REDIS_HOST=<your-redis-host> sentinel-api-gateway
+```
+
+Build context must be the repository root (not `platform-services/
+api-gateway/`) -- the gateway dynamically imports agent source from
+`agents/` at runtime, so the image needs that alongside its own code.
+Requires a reachable Redis. Runs as a non-root user and excludes
+caches/env files from the build context via `.dockerignore`. **This
+Dockerfile has not been build-verified in this environment (no Docker
+available)** -- it was written by directly tracing what the gateway's
+own runtime code needs, but hasn't been run end-to-end; treat it as a
+starting point and verify locally before relying on it.
+
+By default the gateway allows all CORS origins (`SENTINEL_ENVIRONMENT`
+unset or `development`) -- fine for local dev. Setting
+`SENTINEL_ENVIRONMENT=production` requires `SENTINEL_ALLOWED_ORIGINS`
+(comma-separated) to be set explicitly, or the service refuses to start
+with a wildcard policy. This is not authentication -- see "Security /
+deployment caveats" below.
+
+## Installation
+
+```
+make install
+```
+
+Installs everything in `requirements.txt`, including test dependencies
+(`pytest`, `pytest-asyncio`, `jsonschema`).
+
+## Contract validation
+
+```
+make validate-contracts
+```
+
+Runs `schema_loader.py` (Avro schema syntax) and
+`envelope_conformance_lint.py` (envelope-shape conformance) against every
+schema and topic in `contracts/`. This is the same check
+`.github/workflows/contract-validate.yml` runs in CI.
+
+## Tests
+
+```
+make test
+```
+
+Runs the supported Python test suites: `environmental-intelligence-agent`,
+`risk-orchestrator-agent` (`tests/unit` only -- see below), and
+`worker-safety-agent`. No infrastructure (Docker, Redis, Kafka) is required
+-- these suites use `InMemoryTransport` and in-memory fakes throughout.
+
+Each agent's own `pyproject.toml` declares a `[tool.pytest.ini_options]`
+`pythonpath` entry, so you do **not** need to manually export `PYTHONPATH`
+-- just run `make test` from the repo root, or `cd` into an individual
+agent directory and run `pytest` there directly.
+
+Not currently run by `make test` (out of scope for this remediation pass,
+not silently broken):
+- `risk-orchestrator-agent/tests/{load,chaos,performance,production_validation}`
+  -- require live infrastructure (Redis/Postgres/Neo4j/Kafka).
+- `Sentinel_Data_Engine/tests` -- a separate sub-project with its own
+  `requirements.txt`; not part of the agents/contracts workspace this
+  Makefile targets.
+- The remaining ~9 agents under `agents/` either have no `tests/`
+  directory yet or were out of scope for this audit/remediation pass --
+  see `AGENT_GUIDE.md` and each agent's own README for status.
+
+## Development workflow
+
+1. `make install`
+2. `make validate-contracts` before touching any contract-related code
+3. `make test` before opening a PR
+4. See `AGENT_GUIDE.md` before building a new agent -- it documents the
+   working reference pattern (`zone_intelligence_agent`, `hello_agent`)
+   and the agent registry (`contracts/agent-registry/agents.yaml`) that's
+   authoritative for what your agent consumes/produces.
+
+## Current implementation status (honest summary)
+
+This section exists so the repository doesn't claim more than it
+currently does. See the linked forensic-audit reports for the full
+evidence trail behind each line.
+
+**Working, verified by running the code (not just reading it):**
+- Contract validation (`make validate-contracts`).
+- `environmental-intelligence-agent`, `risk-orchestrator-agent` (unit
+  tests), and `worker-safety-agent` unit/integration/contract test
+  suites, all green, all runnable with zero manual setup.
+- The in-memory event transport (`InMemoryTransport`) -- a real, complete
+  local transport, not a mock.
+- `worker-safety-agent` publishing a real `WorkerAnalysisV1` end-to-end
+  through the real producer/schema-provider/transport/consumer stack.
+
+**Implemented but not exercised end-to-end in this pass:**
+- Kafka-mode transport (code-complete, requires a live broker to verify).
+- Redis/Postgres state repositories (code-complete; live-tested in prior
+  work per in-repo agent documentation, not independently re-verified
+  here).
+- Neo4j and Qdrant repositories (code-complete; Neo4j has never been
+  live-tested against a running instance anywhere in this repository's
+  history; Qdrant's vector embeddings are a documented deterministic-hash
+  placeholder, not real semantic embeddings).
+- The Risk Orchestrator's local/global risk scoring math (deterministic,
+  manually verified per `agents/risk-orchestrator-agent/docs/
+  RECONCILIATION_REPORT.md`'s cited scenario runs) and its one-hop
+  cross-zone correlation.
+
+**Explicitly not implemented (documented, not silently missing):**
+- `action-policy-gateway`, `audit-service`, `configuration-service`,
+  `ingestion-gateway`, `notification-service` -- no code, only a
+  Dockerfile placeholder each.
+- Multi-hop / site-wide cascade risk detection (only one-hop neighbor
+  correlation exists) -- see `RECONCILIATION_REPORT.md`.
+- `compliance-intelligence-agent` -- an unresolved architecture decision,
+  documented in its own `OWNERSHIP.md`, not a bug.
+
+## Security / deployment caveats
+
+This is a local-development / reference-implementation configuration, not
+a production security posture:
+- The API gateway's CORS policy defaults to permissive (all origins) in
+  development, and refuses to start with a wildcard policy if
+  `SENTINEL_ENVIRONMENT=production` is set without an explicit
+  `SENTINEL_ALLOWED_ORIGINS` -- see "Running the API gateway" above. This
+  is an origin-restriction boundary, **not authentication** -- no route
+  requires a caller to prove who they are, in either mode. Add real
+  authentication before deploying anywhere reachable beyond localhost.
+- Local-dev default values (e.g. a default Postgres password) are read
+  from environment variables with a local-dev default when unset
+  (`SENTINEL_DB_PASSWORD`, `SENTINEL_DEMO_POSTGRES_DSN` -- see
+  `.env.example`) -- never used as the credential for any shared or
+  reachable database.
+- There is no deployment automation in this repository, and none is
+  assumed. Running the demo locally (`InMemoryTransport`, no Docker
+  required) is the supported and verified path.
+
+## Contributing
+
+See `CONTRIBUTING.md` for setup, the exact commands CI runs (so you can
+run them yourself before opening a PR), and scope expectations.
+`CODE_OF_CONDUCT.md` covers interaction standards.
+
+## License
+
+**No LICENSE file exists in this repository yet.** This is a real,
+outstanding decision, not an oversight this document is papering over --
+choosing a license (MIT, Apache-2.0, "all rights reserved," etc.) is the
+repository owner's call, not something to default silently. Until one is
+added, default copyright applies and no reuse rights are granted.
+
+## Owner decisions
+
+A few things need the repository owner's action, not a code change:
+- **LICENSE** (above).
+- **Dependabot**: `.github/dependabot.yml` configures pip/npm/GitHub-
+  Actions update PRs, but Dependabot itself must be enabled in the
+  GitHub repository settings (Settings -> Code security and analysis) --
+  this file alone does not turn it on.
+- **Secret scanning / CodeQL**: also GitHub repository settings, not
+  something a file in this repository can enable on your behalf.
+
+## Known non-blocking limitations
+
+- The dashboard's `lib/api.ts` and two components use `any` in 19 places
+  (flagged by `npm run lint`) -- functional, but not fully typed. Left
+  as-is rather than guessing at the intended response shapes for each.
+- `sync_files.py` (a ~176KB base64-encoded file-delivery script) and two
+  demo `.mp4` files (~2.1MB combined) remain tracked at their existing
+  sizes/locations -- neither breaks anything, and removing or relocating
+  either is a repository-hygiene call for the owner, not something this
+  pass changed unilaterally.

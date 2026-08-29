@@ -167,8 +167,32 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="SENTINEL API Gateway", lifespan=lifespan)
+
+# Phase 5 remediation note (SENTINEL forensic audit, security foundation):
+# was an unconditional `allow_origins=["*"]`. This does not add
+# authentication (explicitly out of scope -- see SECURITY.md/README.md)
+# but it does close the one gap that was silently identical in dev and
+# prod: a permissive wildcard now only applies when
+# SENTINEL_ENVIRONMENT is unset or "development" (the default, matching
+# every other component's local-dev-first posture in this repo).
+# Setting SENTINEL_ENVIRONMENT=production requires SENTINEL_ALLOWED_ORIGINS
+# to be set explicitly -- the service fails fast at startup rather than
+# silently falling back to a wildcard in that case.
+_environment = os.environ.get("SENTINEL_ENVIRONMENT", "development").strip().lower()
+_allowed_origins_raw = os.environ.get("SENTINEL_ALLOWED_ORIGINS")
+if _allowed_origins_raw:
+    _cors_origins = [origin.strip() for origin in _allowed_origins_raw.split(",") if origin.strip()]
+elif _environment == "production":
+    raise RuntimeError(
+        "SENTINEL_ALLOWED_ORIGINS must be set explicitly when "
+        "SENTINEL_ENVIRONMENT=production -- refusing to start with a "
+        "wildcard CORS policy in production."
+    )
+else:
+    _cors_origins = ["*"]
+
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+    CORSMiddleware, allow_origins=_cors_origins, allow_methods=["*"], allow_headers=["*"],
 )
 
 

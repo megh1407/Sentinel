@@ -1,0 +1,22 @@
+# environmental-intelligence-agent — pytest configuration
+#
+# Was previously an empty file. `tests/` here needs the shared monorepo
+# libraries (`libs/`, root `sentinel_contracts/`) and this agent's own
+# `src/` on sys.path to run; before this file was populated, contributors
+# had to discover and export PYTHONPATH manually (Phase 1 audit, P0-4/P1-4).
+#
+# `pythonpath` is a built-in pytest option (pytest>=7), not a new
+# dependency: paths are relative to this file's directory and are added
+# to sys.path automatically when pytest runs from here.
+#
+# Run from this directory: `pytest tests/`
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "../../libs",
+    "../../sentinel_contracts",
+    "src",
+    ".",
+]
+asyncio_mode = "auto"
+testpaths = ["tests"]

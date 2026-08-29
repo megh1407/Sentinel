@@ -1,0 +1,27 @@
+# risk-orchestrator-agent — pytest configuration
+#
+# Was previously an empty file. `tests/unit` needs the shared monorepo
+# libraries (`libs/`, root `sentinel_contracts/`) and this agent's own
+# `src/` on sys.path to run; before this file was populated, contributors
+# had to discover and export PYTHONPATH manually (Phase 1 audit, P0-4/P1-4).
+#
+# `pythonpath` is a built-in pytest option (pytest>=7), not a new
+# dependency: paths are relative to this file's directory and are added
+# to sys.path automatically when pytest runs from here.
+#
+# Only tests/unit is wired into the supported suite (Phase 2 scope) —
+# tests/load, tests/chaos, tests/performance, and tests/production_validation
+# require live infrastructure (Redis/Postgres/Neo4j/Kafka) and were not
+# part of the Phase 1 baseline; running them is future work, not a
+# regression introduced here.
+#
+# Run from this directory: `pytest tests/unit`
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "../../libs",
+    "../../sentinel_contracts",
+    "src",
+]
+asyncio_mode = "auto"
+testpaths = ["tests/unit"]
