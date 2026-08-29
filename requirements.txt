@@ -23,4 +23,4 @@ prometheus-client>=0.20,<1
 # testing
 pytest>=8.0,<9
 pytest-asyncio>=0.24,<1
-jsonschema>=4.21,<5
+jsonschema>=4.26.0,<5
