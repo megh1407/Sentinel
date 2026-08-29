@@ -1,6 +1,6 @@
 # contracts layer (already built)
 fastavro>=1.9,<2
-pydantic>=2.7,<3
+pydantic>=2.13.4,<3
 requests>=2.31,<3
 
 # eventbus
